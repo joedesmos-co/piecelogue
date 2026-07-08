@@ -1,4 +1,4 @@
-import { jsonOk, methodNotAllowed } from '../http'
+import { jsonOk, methodNotAllowed } from '../http.js'
 
 const APP_NAME = 'Piecelogue'
 const VERSION = '0.1.0'

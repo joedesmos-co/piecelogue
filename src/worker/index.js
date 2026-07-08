@@ -1,4 +1,4 @@
-import { handleApi } from './api/index'
+import { handleApi } from './api/index.js'
 
 export default {
   async fetch(request, env, ctx) {

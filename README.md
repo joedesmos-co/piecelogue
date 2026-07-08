@@ -85,6 +85,74 @@ npx wrangler r2 bucket create piecelogue-artworks
 
 Replace `bucket_name` in `wrangler.jsonc` with the exact created bucket name.
 
+## Auth backend (Phase 1)
+
+Passwordless email magic-link authentication is implemented in the Worker API. The React app and IndexedDB artwork behavior are unchanged in this phase.
+
+### API routes
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/request-link` | Request a magic sign-in link |
+| `GET` | `/api/auth/verify?token=...` | Consume link, create session, redirect to `/app?auth=success` |
+| `GET` | `/api/auth/me` | Return current signed-in user or `authenticated: false` |
+| `POST` | `/api/auth/logout` | Revoke session and clear cookie |
+
+Sessions are opaque server-side records in D1, stored in the `__Host-piecelogue_session` HttpOnly cookie. Raw tokens are never returned in production responses.
+
+### Apply auth migration locally
+
+```bash
+npx wrangler d1 migrations apply piecelogue --local
+```
+
+Do not apply to remote until you are ready to deploy auth.
+
+### Local Worker testing
+
+Create `.dev.vars` (not committed):
+
+```bash
+AUTH_DEV_MODE=true
+APP_ORIGIN=http://localhost:8787
+ENVIRONMENT=development
+```
+
+Optional for real email delivery:
+
+```bash
+AUTH_FROM_EMAIL=noreply@your-verified-domain.com
+```
+
+Run the Worker locally:
+
+```bash
+npm run build
+npx wrangler dev
+```
+
+Request a link (dev mode returns `dev.magicLink` in the JSON response):
+
+```bash
+curl -s -X POST http://localhost:8787/api/auth/request-link \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"artist@example.com"}'
+```
+
+Verify session:
+
+```bash
+curl -s http://localhost:8787/api/auth/me -H 'Cookie: __Host-piecelogue_session=YOUR_TOKEN'
+```
+
+### Production email setup (manual)
+
+1. Enable the Cloudflare `send_email` binding as `EMAIL` in `wrangler.jsonc`
+2. Set `AUTH_FROM_EMAIL` in the Cloudflare dashboard or secrets
+3. Set `AUTH_DEV_MODE` to false or remove it
+4. Apply migration: `npx wrangler d1 migrations apply piecelogue --remote`
+5. Deploy: `npm run build && npx wrangler deploy`
+
 ## Data storage
 
 The current version stores all artwork images and metadata locally in your browser. There is no cloud sync or user accounts yet. Clearing browser data may remove your library. The app at `/app` uses the same origin IndexedDB as before — moving routes does not reset data.

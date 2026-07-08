@@ -21,5 +21,18 @@
       "binding": "ARTWORK_BUCKET",
       "bucket_name": "piecelogue-artwork"
     }
-  ]
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://piecelogue.com",
+    "ENVIRONMENT": "production"
+  }
+  // Email sending (configure before enabling magic links in production):
+  // "send_email": [
+  //   {
+  //     "name": "EMAIL",
+  //     "allowed_destination_addresses": ["*"]
+  //   }
+  // ]
+  // Set AUTH_FROM_EMAIL in the dashboard or .dev.vars (not committed).
+  // For local dev only: AUTH_DEV_MODE=true reveals magic links in API responses.
 }
