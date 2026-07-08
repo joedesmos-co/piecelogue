@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Cloud, LoaderCircle } from 'lucide-react'
+import { Cloud, LoaderCircle, RefreshCw } from 'lucide-react'
 import { fetchCloudStatus } from '../api/cloud'
+import { useAuth } from '../hooks/useAuth'
+import { useSync } from '../hooks/useSync'
 import { saveLibraryToCloud } from '../utils/cloudSave'
+import { wakeSyncProcessor } from '../sync/processor'
 
-function formatSavedAt(value) {
+function formatTimestamp(value) {
   if (!value) return null
 
   const date = new Date(value)
@@ -12,15 +15,36 @@ function formatSavedAt(value) {
   return date.toLocaleString()
 }
 
+function getStatusLabel(status) {
+  switch (status.state) {
+    case 'up-to-date':
+      return 'Up to date'
+    case 'syncing':
+      return 'Syncing...'
+    case 'pending':
+    case 'waiting':
+      return `${status.pendingCount} change${status.pendingCount === 1 ? '' : 's'} waiting to sync`
+    case 'offline':
+      return 'Offline — changes saved locally'
+    case 'error':
+      return 'Sync error'
+    case 'signed-out':
+    default:
+      return null
+  }
+}
+
 export default function CloudSaveSection({ authenticated }) {
+  const { user } = useAuth()
+  const { status, retryNow } = useSync()
   const [cloudStatus, setCloudStatus] = useState(null)
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusError, setStatusError] = useState('')
-  const [showWarning, setShowWarning] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
+  const [showForceWarning, setShowForceWarning] = useState(false)
+  const [forcing, setForcing] = useState(false)
+  const [forceError, setForceError] = useState('')
   const [progress, setProgress] = useState(null)
-  const [saveResult, setSaveResult] = useState(null)
+  const [forceResult, setForceResult] = useState(null)
 
   useEffect(() => {
     if (!authenticated) {
@@ -34,9 +58,9 @@ export default function CloudSaveSection({ authenticated }) {
       setStatusError('')
 
       try {
-        const status = await fetchCloudStatus()
+        const remoteStatus = await fetchCloudStatus()
         if (!cancelled) {
-          setCloudStatus(status)
+          setCloudStatus(remoteStatus)
         }
       } catch (err) {
         if (!cancelled) {
@@ -53,29 +77,33 @@ export default function CloudSaveSection({ authenticated }) {
     return () => {
       cancelled = true
     }
-  }, [authenticated, saveResult])
+  }, [authenticated, forceResult, status.lastSyncedAt])
 
-  async function handleConfirmSave() {
-    setShowWarning(false)
-    setSaving(true)
-    setSaveError('')
-    setSaveResult(null)
+  async function handleForceSync() {
+    setShowForceWarning(false)
+    setForcing(true)
+    setForceError('')
+    setForceResult(null)
     setProgress({
       phase: 'starting',
-      message: 'Preparing library upload...',
+      message: 'Preparing full library upload...',
       current: 0,
       total: 0,
     })
 
     try {
-      const result = await saveLibraryToCloud({ onProgress: setProgress })
-      setSaveResult(result)
-      const status = await fetchCloudStatus()
-      setCloudStatus(status)
+      const result = await saveLibraryToCloud({
+        userId: user?.id,
+        onProgress: setProgress,
+      })
+      setForceResult(result)
+      const remoteStatus = await fetchCloudStatus()
+      setCloudStatus(remoteStatus)
+      wakeSyncProcessor()
     } catch (err) {
-      setSaveError(err.message || 'Failed to save library to cloud.')
+      setForceError(err.message || 'Failed to save library to cloud.')
     } finally {
-      setSaving(false)
+      setForcing(false)
     }
   }
 
@@ -84,18 +112,19 @@ export default function CloudSaveSection({ authenticated }) {
       <section className="settings-section">
         <h3 className="settings-section-title">
           <Cloud size={18} />
-          Cloud Storage
+          Cloud Sync
         </h3>
         <div className="settings-card settings-card--placeholder">
           <p className="settings-text settings-text--muted">
-            Sign in to save your library to your Piecelogue account.
+            Sign in to automatically sync your library to your Piecelogue account.
           </p>
         </div>
       </section>
     )
   }
 
-  const lastSavedAt = formatSavedAt(cloudStatus?.lastSavedAt)
+  const statusLabel = getStatusLabel(status)
+  const lastSyncedAt = formatTimestamp(status.lastSyncedAt || cloudStatus?.lastSavedAt)
   const progressPercent =
     progress?.total > 0 ? Math.round((progress.current / progress.total) * 100) : null
 
@@ -103,14 +132,38 @@ export default function CloudSaveSection({ authenticated }) {
     <section className="settings-section">
       <h3 className="settings-section-title">
         <Cloud size={18} />
-        Cloud Storage
+        Cloud Sync
       </h3>
 
       <div className="settings-card">
         <p className="settings-text settings-text--muted">
-          Save this device&apos;s current folders and artworks to your Piecelogue account.
-          Cloud sync and restore are still in progress.
+          Changes on this device sync automatically while you are signed in. Local deletes are not
+          synced to the cloud yet.
         </p>
+
+        <div className={`sync-status-banner sync-status-banner--${status.state}`}>
+          {status.state === 'syncing' || forcing ? (
+            <LoaderCircle size={16} className="cloud-save-spinner" aria-hidden="true" />
+          ) : null}
+          <div>
+            <p className="sync-status-label">{forcing ? 'Force syncing...' : statusLabel}</p>
+            {status.state === 'error' && status.error ? (
+              <p className="settings-text settings-text--muted">{status.error}</p>
+            ) : null}
+            {lastSyncedAt ? (
+              <p className="settings-text settings-text--muted">Last synced: {lastSyncedAt}</p>
+            ) : (
+              <p className="settings-text settings-text--muted">Not synced yet.</p>
+            )}
+          </div>
+        </div>
+
+        {status.state === 'error' ? (
+          <button type="button" className="btn btn--secondary btn--sm" onClick={retryNow}>
+            <RefreshCw size={14} />
+            Retry now
+          </button>
+        ) : null}
 
         {statusLoading ? (
           <p className="settings-text settings-text--muted">Loading cloud status...</p>
@@ -127,34 +180,29 @@ export default function CloudSaveSection({ authenticated }) {
             <p className="settings-text">
               Cloud library: {cloudStatus.folderCount} folders, {cloudStatus.artworkCount} artworks
             </p>
-            {lastSavedAt ? (
-              <p className="settings-text settings-text--muted">Last saved: {lastSavedAt}</p>
-            ) : (
-              <p className="settings-text settings-text--muted">Not saved to cloud yet.</p>
-            )}
           </div>
         ) : null}
 
-        {showWarning ? (
+        {showForceWarning ? (
           <div className="cloud-save-warning" role="note">
             <p className="settings-text">
-              This saves this device&apos;s current library to your Piecelogue account. Cloud
-              sync/restore is still in progress.
+              Force full sync uploads this device&apos;s entire library to your account and clears
+              pending auto-sync jobs. Use this if auto-sync gets stuck.
             </p>
             <div className="account-actions">
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
-                onClick={handleConfirmSave}
-                disabled={saving}
+                onClick={handleForceSync}
+                disabled={forcing}
               >
-                Save library to cloud
+                Force full sync
               </button>
               <button
                 type="button"
                 className="btn btn--secondary btn--sm"
-                onClick={() => setShowWarning(false)}
-                disabled={saving}
+                onClick={() => setShowForceWarning(false)}
+                disabled={forcing}
               >
                 Cancel
               </button>
@@ -163,15 +211,15 @@ export default function CloudSaveSection({ authenticated }) {
         ) : (
           <button
             type="button"
-            className="btn btn--primary btn--sm"
-            onClick={() => setShowWarning(true)}
-            disabled={saving}
+            className="btn btn--ghost btn--sm"
+            onClick={() => setShowForceWarning(true)}
+            disabled={forcing}
           >
-            Save library to cloud
+            Force full sync
           </button>
         )}
 
-        {saving && progress ? (
+        {forcing && progress ? (
           <div className="cloud-save-progress" aria-live="polite">
             <div className="cloud-save-progress-header">
               <LoaderCircle size={16} className="cloud-save-spinner" aria-hidden="true" />
@@ -188,15 +236,15 @@ export default function CloudSaveSection({ authenticated }) {
           </div>
         ) : null}
 
-        {saveError ? (
+        {forceError ? (
           <div className="form-error" role="alert">
-            {saveError}
+            {forceError}
           </div>
         ) : null}
 
-        {saveResult ? (
+        {forceResult ? (
           <div className="cloud-save-success" role="status">
-            Saved {saveResult.folderCount} folders and {saveResult.artworkCount} artworks to cloud.
+            Force synced {forceResult.folderCount} folders and {forceResult.artworkCount} artworks.
           </div>
         ) : null}
       </div>

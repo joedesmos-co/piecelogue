@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArtworkContext } from './artworkContext'
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
+import {
+  enqueueArtworkMetadataSync,
+  enqueueArtworkSync,
+  enqueueFolderSync,
+} from '../sync/enqueue'
 
 export function ArtworkProvider({ children }) {
   const [artworks, setArtworks] = useState([])
@@ -54,12 +59,14 @@ export function ArtworkProvider({ children }) {
 
   const addArtwork = useCallback(async (data, imageBlob) => {
     const artwork = await artworkService.createArtwork(data, imageBlob)
+    await enqueueArtworkSync(artwork.id)
     await refresh()
     return artwork
   }, [refresh])
 
-  const editArtwork = useCallback(async (id, data, imageBlob) => {
+  const editArtwork = useCallback(async (id, data, imageBlob = null) => {
     const artwork = await artworkService.updateArtwork(id, data, imageBlob)
+    await enqueueArtworkSync(id, { includeImage: Boolean(imageBlob) })
     await refresh()
     return artwork
   }, [refresh])
@@ -71,18 +78,21 @@ export function ArtworkProvider({ children }) {
 
   const toggleFavorite = useCallback(async (id) => {
     const artwork = await artworkService.toggleFavorite(id)
+    await enqueueArtworkMetadataSync(id)
     await refresh()
     return artwork
   }, [refresh])
 
   const createFolder = useCallback(async (name, parentFolderId = null) => {
     const folder = await folderService.createFolder(name, parentFolderId)
+    await enqueueFolderSync(folder.id)
     await refresh()
     return folder
   }, [refresh])
 
   const updateFolder = useCallback(async (id, { name, parentFolderId }) => {
     const folder = await folderService.updateFolder(id, { name, parentFolderId })
+    await enqueueFolderSync(id)
     await refresh()
     return folder
   }, [refresh])

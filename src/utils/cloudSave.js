@@ -1,43 +1,17 @@
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
+import { clearSyncQueueForUser } from '../db/syncQueueService'
 import {
   uploadCloudArtworkOriginal,
   uploadCloudArtworkThumbnail,
   uploadCloudArtworks,
   uploadCloudFolders,
 } from '../api/cloud'
+import { toCloudArtworkMetadata, toCloudFolder } from '../sync/cloudPayload'
+import { recordForceSyncComplete } from '../sync/processor'
 import { getFullImageBlob, getGalleryImageBlob } from './imageUtils'
 
 const METADATA_BATCH_SIZE = 25
-
-function toCloudArtworkMetadata(artwork) {
-  return {
-    id: artwork.id,
-    folderId: artwork.folderId ?? null,
-    title: artwork.title,
-    mediumType: artwork.mediumType,
-    medium: artwork.medium ?? '',
-    status: artwork.status,
-    hours: artwork.hours ?? 0,
-    minutes: artwork.minutes ?? 0,
-    totalMinutes: artwork.totalMinutes ?? 0,
-    artworkDate: artwork.artworkDate ?? null,
-    notes: artwork.notes ?? '',
-    favorite: Boolean(artwork.favorite),
-    createdAt: artwork.createdAt,
-    updatedAt: artwork.updatedAt,
-  }
-}
-
-function toCloudFolder(folder) {
-  return {
-    id: folder.id,
-    name: folder.name,
-    parentFolderId: folder.parentFolderId ?? null,
-    createdAt: folder.createdAt,
-    updatedAt: folder.updatedAt,
-  }
-}
 
 function buildImageUploadSteps(artworks) {
   const steps = []
@@ -54,7 +28,7 @@ function buildImageUploadSteps(artworks) {
   return steps
 }
 
-export async function saveLibraryToCloud({ onProgress }) {
+export async function saveLibraryToCloud({ onProgress, userId } = {}) {
   const folders = await folderService.getAllFolders()
   const artworks = await artworkService.getAllArtworks()
   const imageSteps = buildImageUploadSteps(artworks)
@@ -105,6 +79,11 @@ export async function saveLibraryToCloud({ onProgress }) {
     } else {
       await uploadCloudArtworkThumbnail(artwork.id, blob)
     }
+  }
+
+  if (userId) {
+    await clearSyncQueueForUser(userId)
+    await recordForceSyncComplete(userId, artworks)
   }
 
   onProgress?.({

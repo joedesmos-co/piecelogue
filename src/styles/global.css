@@ -1501,9 +1501,43 @@ a.btn--public:hover,
 }
 
 .cloud-status-summary {
+  margin-top: 12px;
+}
+
+.sync-status-banner {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
+.sync-status-banner--up-to-date {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+}
+
+.sync-status-banner--syncing,
+.sync-status-banner--pending,
+.sync-status-banner--waiting {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+.sync-status-banner--offline {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+
+.sync-status-banner--error {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+.sync-status-label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
 }
 
 .cloud-save-warning {
