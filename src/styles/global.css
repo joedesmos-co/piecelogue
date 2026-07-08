@@ -1369,6 +1369,25 @@ a.btn--public:hover,
   word-break: break-word;
 }
 
+.account-profile-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-username-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-username {
+  font-weight: 600;
+  color: var(--accent);
+  word-break: break-word;
+}
+
 .account-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1539,6 +1558,13 @@ a.btn--public:hover,
 .form-label--required::after {
   content: ' *';
   color: var(--danger);
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
 }
 
 .form-input,

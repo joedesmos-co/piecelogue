@@ -95,7 +95,7 @@ function SignInForm({ onClose }) {
 
 export default function SignInDialog({ isOpen, onClose }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Development email login" className="modal--small">
+    <Modal isOpen={isOpen} onClose={onClose} title="Sign in with email" className="modal--small">
       {isOpen ? <SignInForm key="sign-in" onClose={onClose} /> : null}
     </Modal>
   )

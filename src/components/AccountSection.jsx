@@ -1,13 +1,64 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Cloud, LogOut, User } from 'lucide-react'
+import { fetchProfile, updateUsername } from '../api/profile'
 import { useAuth } from '../hooks/useAuth'
 import SignInDialog from './SignInDialog'
+import UsernameDialog from './UsernameDialog'
+
+const GOOGLE_SIGN_IN_URL = '/api/auth/google/start'
+
+function startGoogleSignIn() {
+  window.location.href = GOOGLE_SIGN_IN_URL
+}
+
+function formatHandle(username) {
+  if (!username) return null
+  return username.startsWith('@') ? username : `@${username}`
+}
 
 export default function AccountSection() {
   const { authenticated, user, loading, error, signOut } = useAuth()
-  const [showDevSignIn, setShowDevSignIn] = useState(false)
+  const [profile, setProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [showEmailSignIn, setShowEmailSignIn] = useState(false)
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false)
+  const [savingUsername, setSavingUsername] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
+
+  useEffect(() => {
+    if (!authenticated) {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadProfile() {
+      setProfileLoading(true)
+      setProfileError('')
+
+      try {
+        const result = await fetchProfile()
+        if (!cancelled) {
+          setProfile(result.profile)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setProfileError(err.message || 'Failed to load profile.')
+        }
+      } finally {
+        if (!cancelled) {
+          setProfileLoading(false)
+        }
+      }
+    }
+
+    loadProfile()
+    return () => {
+      cancelled = true
+    }
+  }, [authenticated, user?.id])
 
   async function handleSignOut() {
     setSignOutError('')
@@ -15,12 +66,28 @@ export default function AccountSection() {
 
     try {
       await signOut()
+      setProfile(null)
     } catch (err) {
       setSignOutError(err.message || 'Unable to sign out. Please try again.')
     } finally {
       setSigningOut(false)
     }
   }
+
+  async function handleSaveUsername(username) {
+    setSavingUsername(true)
+
+    try {
+      const result = await updateUsername(username)
+      setProfile(result.profile)
+    } finally {
+      setSavingUsername(false)
+    }
+  }
+
+  const email = authenticated ? (profile?.email ?? user?.email) : null
+  const username = authenticated ? (profile?.username ?? null) : null
+  const usernameDialogTitle = username ? 'Edit username' : 'Choose username'
 
   return (
     <>
@@ -31,7 +98,7 @@ export default function AccountSection() {
         </h3>
 
         <div className="settings-card">
-          {loading ? (
+          {loading || (authenticated && profileLoading) ? (
             <p className="settings-text settings-text--muted">Loading account...</p>
           ) : null}
 
@@ -41,11 +108,36 @@ export default function AccountSection() {
             </div>
           ) : null}
 
-          {!loading && !error && authenticated ? (
+          {!loading && authenticated && profileError ? (
+            <div className="alert alert--error" role="alert">
+              {profileError}
+            </div>
+          ) : null}
+
+          {!loading && !error && authenticated && !profileLoading ? (
             <div className="account-signed-in">
-              <p className="settings-text">
-                Signed in as <span className="account-email">{user?.email}</span>
-              </p>
+              <div className="account-profile-fields">
+                <p className="settings-text">
+                  Email <span className="account-email">{email}</span>
+                </p>
+                <div className="account-username-row">
+                  <p className="settings-text">
+                    Username{' '}
+                    {username ? (
+                      <span className="account-username">{formatHandle(username)}</span>
+                    ) : (
+                      <span className="settings-text--muted">Not set yet</span>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    onClick={() => setShowUsernameDialog(true)}
+                  >
+                    {username ? 'Edit' : 'Choose username'}
+                  </button>
+                </div>
+              </div>
               <div className="account-actions">
                 <button
                   type="button"
@@ -68,21 +160,23 @@ export default function AccountSection() {
           {!loading && !error && !authenticated ? (
             <div className="account-signed-out">
               <p className="settings-text settings-text--muted">
-                Sign in to link your account. Cloud sync is not available yet.
+                Sign in to reserve a username for future sharing. Cloud sync is not available yet.
               </p>
               <div className="account-sign-in-options">
-                <a href="/api/auth/google/start" className="btn btn--primary account-google-btn">
+                <button
+                  type="button"
+                  className="btn btn--primary account-google-btn"
+                  onClick={startGoogleSignIn}
+                >
                   Continue with Google
-                </a>
-                {import.meta.env.DEV ? (
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    onClick={() => setShowDevSignIn(true)}
-                  >
-                    Development email login
-                  </button>
-                ) : null}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => setShowEmailSignIn(true)}
+                >
+                  Use email instead
+                </button>
               </div>
             </div>
           ) : null}
@@ -99,7 +193,15 @@ export default function AccountSection() {
         </div>
       </section>
 
-      <SignInDialog isOpen={showDevSignIn} onClose={() => setShowDevSignIn(false)} />
+      <SignInDialog isOpen={showEmailSignIn} onClose={() => setShowEmailSignIn(false)} />
+      <UsernameDialog
+        isOpen={showUsernameDialog}
+        onClose={() => setShowUsernameDialog(false)}
+        onSubmit={handleSaveUsername}
+        initialUsername={username ?? ''}
+        title={usernameDialogTitle}
+        saving={savingUsername}
+      />
     </>
   )
 }
