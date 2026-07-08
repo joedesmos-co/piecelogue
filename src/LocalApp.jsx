@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AuthProvider } from './context/AuthProvider'
 import { SyncProvider } from './context/SyncProvider'
 import { ArtworkProvider } from './context/ArtworkProvider'
+import { RestoreProvider } from './context/RestoreProvider'
 import { useArtworks } from './hooks/useArtworks'
 import AppShell from './components/AppShell'
 import Modal from './components/Modal'
@@ -113,7 +114,9 @@ export default function LocalApp() {
     <AuthProvider>
       <SyncProvider>
         <ArtworkProvider>
-          <AppContent />
+          <RestoreProvider>
+            <AppContent />
+          </RestoreProvider>
         </ArtworkProvider>
       </SyncProvider>
     </AuthProvider>

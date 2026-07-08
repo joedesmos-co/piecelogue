@@ -9,14 +9,30 @@ export async function getSyncState(userId) {
 
 export async function markLibrarySeeded(userId) {
   const now = new Date().toISOString()
-  const existing = await getSyncState(userId)
+  const existing = (await getSyncState(userId)) || { userId }
 
   await db.syncState.put({
+    ...existing,
     userId,
-    librarySeededAt: existing?.librarySeededAt || now,
-    lastSyncedAt: existing?.lastSyncedAt ?? null,
+    librarySeededAt: existing.librarySeededAt || now,
     updatedAt: now,
   })
+}
+
+export async function setRestoreDismissed(userId, timestamp = new Date().toISOString()) {
+  const existing = (await getSyncState(userId)) || { userId }
+
+  await db.syncState.put({
+    ...existing,
+    userId,
+    restoreDismissedAt: timestamp,
+    updatedAt: timestamp,
+  })
+}
+
+export async function isRestoreDismissed(userId) {
+  const state = await getSyncState(userId)
+  return Boolean(state?.restoreDismissedAt)
 }
 
 export async function setLastSyncedAt(userId, timestamp = new Date().toISOString()) {

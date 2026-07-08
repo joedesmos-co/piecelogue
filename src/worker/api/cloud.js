@@ -2,6 +2,8 @@ import { AUTH_CACHE_HEADERS } from '../auth/constants.js'
 import { CLOUD_MAX_IMAGE_BYTES, CLOUD_MAX_JSON_BYTES, CLOUD_MAX_THUMBNAIL_BYTES, ALLOWED_IMAGE_TYPES } from '../cloud/constants.js'
 import {
   assertArtworkOwnedByUser,
+  getArtworkImageObject,
+  getCloudLibrary,
   getCloudStatus,
   saveArtworkOriginal,
   saveArtworkThumbnail,
@@ -182,6 +184,53 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
   }
 }
 
+async function handleGetLibrary(request, env) {
+  const auth = await requireAuthenticatedUser(request, env)
+  if (auth.error) {
+    return withCloudHeaders(auth.error)
+  }
+
+  const library = await getCloudLibrary(env.DB, auth.user.id)
+  return withCloudHeaders(
+    jsonOk({
+      ok: true,
+      library,
+    }),
+  )
+}
+
+async function handleGetArtworkImage(request, env, artworkId, imageType) {
+  const auth = await requireAuthenticatedUser(request, env)
+  if (auth.error) {
+    return withCloudHeaders(auth.error)
+  }
+
+  if (!env.ARTWORK_BUCKET) {
+    return withCloudHeaders(jsonError(503, 'service_unavailable', 'Cloud storage is not available.'))
+  }
+
+  const object = await getArtworkImageObject(
+    env.DB,
+    env.ARTWORK_BUCKET,
+    auth.user.id,
+    artworkId,
+    imageType,
+  )
+
+  if (!object) {
+    return withCloudHeaders(jsonError(404, 'not_found', 'Image not found.'))
+  }
+
+  const headers = new Headers()
+  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream')
+  headers.set('Content-Length', String(object.size))
+  for (const [key, value] of Object.entries(AUTH_CACHE_HEADERS)) {
+    headers.set(key, value)
+  }
+
+  return new Response(object.body, { status: 200, headers })
+}
+
 async function handleGetStatus(request, env) {
   if (request.method !== 'GET') {
     return methodNotAllowed(['GET'])
@@ -214,14 +263,24 @@ export async function handleCloudRoute(request, env, path) {
     return handleGetStatus(request, env)
   }
 
+  if (path === '/api/cloud/library' && request.method === 'GET') {
+    return handleGetLibrary(request, env)
+  }
+
   const originalArtworkId = parseArtworkImagePath(path, 'original')
   if (originalArtworkId && request.method === 'PUT') {
     return handlePutArtworkImage(request, env, originalArtworkId, 'original')
+  }
+  if (originalArtworkId && request.method === 'GET') {
+    return handleGetArtworkImage(request, env, originalArtworkId, 'original')
   }
 
   const thumbnailArtworkId = parseArtworkImagePath(path, 'thumbnail')
   if (thumbnailArtworkId && request.method === 'PUT') {
     return handlePutArtworkImage(request, env, thumbnailArtworkId, 'thumbnail')
+  }
+  if (thumbnailArtworkId && request.method === 'GET') {
+    return handleGetArtworkImage(request, env, thumbnailArtworkId, 'thumbnail')
   }
 
   return null

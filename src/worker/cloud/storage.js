@@ -253,6 +253,87 @@ export async function saveArtworkThumbnail(db, bucket, userId, artworkId, body, 
   return { objectKey, updatedAt }
 }
 
+export function mapCloudFolderRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    parentFolderId: row.parent_folder_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function mapCloudArtworkRow(row) {
+  return {
+    id: row.id,
+    folderId: row.folder_id ?? null,
+    title: row.title,
+    mediumType: row.medium_type || 'Other',
+    medium: row.medium || '',
+    status: row.status || 'In Progress',
+    hours: row.hours ?? 0,
+    minutes: row.minutes ?? 0,
+    totalMinutes: row.total_minutes ?? 0,
+    artworkDate: row.artwork_date ?? null,
+    notes: row.notes || '',
+    favorite: Boolean(row.favorite),
+    hasOriginal: Boolean(row.original_object_key),
+    hasThumbnail: Boolean(row.thumbnail_object_key),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export async function getCloudLibrary(db, userId) {
+  const folderResult = await db
+    .prepare(
+      `SELECT id, name, parent_folder_id, created_at, updated_at
+       FROM folders
+       WHERE user_id = ? AND deleted_at IS NULL
+       ORDER BY created_at`,
+    )
+    .bind(userId)
+    .all()
+
+  const artworkResult = await db
+    .prepare(
+      `SELECT id, folder_id, title, medium_type, medium, status,
+              hours, minutes, total_minutes, artwork_date, notes, favorite,
+              original_object_key, thumbnail_object_key, created_at, updated_at
+       FROM artworks
+       WHERE user_id = ? AND deleted_at IS NULL
+       ORDER BY created_at`,
+    )
+    .bind(userId)
+    .all()
+
+  return {
+    folders: (folderResult?.results ?? []).map(mapCloudFolderRow),
+    artworks: (artworkResult?.results ?? []).map(mapCloudArtworkRow),
+  }
+}
+
+export async function getArtworkImageObject(db, bucket, userId, artworkId, imageType) {
+  const row = await db
+    .prepare(
+      'SELECT user_id, original_object_key, thumbnail_object_key FROM artworks WHERE id = ?',
+    )
+    .bind(artworkId)
+    .first()
+
+  if (!row || row.user_id !== userId) {
+    return null
+  }
+
+  const objectKey =
+    imageType === 'thumbnail' ? row.thumbnail_object_key : row.original_object_key
+  if (!objectKey) {
+    return null
+  }
+
+  return bucket.get(objectKey)
+}
+
 export async function getCloudStatus(db, userId) {
   const folderCount = await db
     .prepare('SELECT COUNT(*) AS count FROM folders WHERE user_id = ? AND deleted_at IS NULL')

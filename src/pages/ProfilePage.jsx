@@ -9,6 +9,7 @@ import {
   Shapes,
 } from 'lucide-react'
 import AccountSection from '../components/AccountSection'
+import CloudRestoreSection from '../components/CloudRestoreSection'
 import CloudSaveSection from '../components/CloudSaveSection'
 import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
@@ -58,6 +59,8 @@ export default function ProfilePage() {
       </header>
 
       <AccountSection />
+
+      <CloudRestoreSection authenticated={authenticated} />
 
       <CloudSaveSection authenticated={authenticated} />
 

@@ -35,6 +35,30 @@ export async function fetchCloudStatus() {
   return data.status ?? null
 }
 
+export async function fetchCloudLibrary() {
+  const data = await apiFetch('/api/cloud/library')
+  return data.library ?? { folders: [], artworks: [] }
+}
+
+export async function downloadCloudArtworkImage(artworkId, imageType) {
+  const response = await fetch(
+    `/api/cloud/artworks/${encodeURIComponent(artworkId)}/${imageType}`,
+    { credentials: 'include' },
+  )
+
+  if (!response.ok) {
+    let data = null
+    const contentType = response.headers.get('Content-Type') || ''
+    if (contentType.includes('application/json')) {
+      data = await response.json()
+    }
+    const message = data?.error?.message || `Image download failed (${response.status})`
+    throw new ApiError(message, data?.error?.code, response.status)
+  }
+
+  return response.blob()
+}
+
 export async function uploadCloudFolders(folders) {
   return apiFetch('/api/cloud/folders', {
     method: 'PUT',
