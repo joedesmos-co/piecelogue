@@ -7,6 +7,7 @@ function clearAuthSuccessQuery() {
   if (url.searchParams.get('auth') !== 'success') return false
 
   url.searchParams.delete('auth')
+  url.searchParams.delete('view')
   const nextUrl = `${url.pathname}${url.search}${url.hash}`
   window.history.replaceState({}, '', nextUrl)
   return true

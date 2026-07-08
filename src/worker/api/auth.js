@@ -190,7 +190,7 @@ async function handleVerify(request, env) {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: `${origin}/app?auth=success`,
+      Location: `${origin}/app?auth=success&view=profile`,
       'Set-Cookie': buildSessionCookie(session.rawToken, request, env),
       ...VERIFY_REDIRECT_HEADERS,
     },

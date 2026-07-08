@@ -12,9 +12,18 @@ import { PAGES } from './utils/constants'
 import { applyPageSeo } from './utils/seo'
 import { PAGE_SEO } from './utils/site'
 
+function getInitialPage() {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('auth') === 'success' && params.get('view') === PAGES.PROFILE) {
+    return PAGES.PROFILE
+  }
+
+  return PAGES.GALLERY
+}
+
 function AppContent() {
   const { addArtwork, editArtwork, folders } = useArtworks()
-  const [currentPage, setCurrentPage] = useState(PAGES.GALLERY)
+  const [currentPage, setCurrentPage] = useState(getInitialPage)
   const [showForm, setShowForm] = useState(false)
   const [editingArtwork, setEditingArtwork] = useState(null)
   const [defaultFolderId, setDefaultFolderId] = useState(null)

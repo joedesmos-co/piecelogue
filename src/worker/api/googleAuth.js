@@ -122,7 +122,7 @@ export async function handleGoogleCallback(request, env) {
     const session = await createSession(env.DB, user.id)
     const origin = getAppOrigin(env, request)
     const headers = new Headers({
-      Location: `${origin}/app?auth=success`,
+      Location: `${origin}/app?auth=success&view=profile`,
       ...VERIFY_REDIRECT_HEADERS,
     })
     headers.append('Set-Cookie', buildSessionCookie(session.rawToken, request, env))
