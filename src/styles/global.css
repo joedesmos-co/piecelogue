@@ -1356,6 +1356,52 @@ a.btn--public:hover,
   margin: 0;
 }
 
+.account-signed-in,
+.account-signed-out {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-email {
+  font-weight: 600;
+  color: var(--text-heading);
+  word-break: break-word;
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.account-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sign-in-success {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-dev-login {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border);
+}
+
+.settings-dev-login-note {
+  font-size: 12px;
+  margin: 0;
+}
+
 /* ── Modal ── */
 
 .modal-overlay {

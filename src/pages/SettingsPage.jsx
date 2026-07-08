@@ -1,4 +1,5 @@
 import { HardDrive, Sun, Download, Info } from 'lucide-react'
+import AccountSection from '../components/AccountSection'
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../utils/constants'
 
 export default function SettingsPage() {
@@ -8,6 +9,8 @@ export default function SettingsPage() {
         <h2 className="page-title">Settings</h2>
         <p className="page-subtitle">App preferences and information</p>
       </header>
+
+      <AccountSection />
 
       <section className="settings-section">
         <h3 className="settings-section-title">

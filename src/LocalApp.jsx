@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AuthProvider } from './context/AuthProvider'
 import { ArtworkProvider } from './context/ArtworkProvider'
 import { useArtworks } from './hooks/useArtworks'
 import AppShell from './components/AppShell'
@@ -99,8 +100,10 @@ function AppContent() {
 
 export default function LocalApp() {
   return (
-    <ArtworkProvider>
-      <AppContent />
-    </ArtworkProvider>
+    <AuthProvider>
+      <ArtworkProvider>
+        <AppContent />
+      </ArtworkProvider>
+    </AuthProvider>
   )
 }
