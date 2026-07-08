@@ -8,6 +8,8 @@ import {
   Shapes,
 } from 'lucide-react'
 import AccountSection from '../components/AccountSection'
+import CloudSaveSection from '../components/CloudSaveSection'
+import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
 import { formatTime } from '../utils/formatTime'
@@ -27,6 +29,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
 }
 
 export default function ProfilePage() {
+  const { authenticated } = useAuth()
   const { artworks } = useArtworks()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -54,6 +57,8 @@ export default function ProfilePage() {
       </header>
 
       <AccountSection />
+
+      <CloudSaveSection authenticated={authenticated} />
 
       <section className="settings-section">
         <h3 className="settings-section-title">

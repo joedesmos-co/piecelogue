@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Cloud, LogOut, User } from 'lucide-react'
+import { LogOut, User } from 'lucide-react'
 import { fetchProfile, updateUsername } from '../api/profile'
 import { useAuth } from '../hooks/useAuth'
 import SignInDialog from './SignInDialog'
@@ -180,16 +180,6 @@ export default function AccountSection() {
               </div>
             </div>
           ) : null}
-        </div>
-      </section>
-
-      <section className="settings-section">
-        <h3 className="settings-section-title">
-          <Cloud size={18} />
-          Cloud Sync
-        </h3>
-        <div className="settings-card settings-card--placeholder">
-          <p className="settings-text settings-text--muted">Cloud Sync: Not enabled yet</p>
         </div>
       </section>
 

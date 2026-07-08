@@ -1,12 +1,11 @@
 import { AUTH_CACHE_HEADERS, MAX_JSON_BODY_BYTES } from '../auth/constants.js'
-import { getSessionTokenFromRequest } from '../auth/cookies.js'
+import { requireAuthenticatedUser } from '../auth/requireUser.js'
 import {
   findUserByUsername,
   getUserProfileById,
   publicProfile,
   updateUserUsername,
 } from '../auth/profile.js'
-import { getActiveSessionForToken } from '../auth/sessions.js'
 import { validateUsername } from '../auth/username.js'
 import { jsonError, jsonOk, methodNotAllowed } from '../http.js'
 
@@ -56,29 +55,6 @@ function withProfileHeaders(response) {
     statusText: response.statusText,
     headers,
   })
-}
-
-async function requireAuthenticatedUser(request, env) {
-  if (!env.DB) {
-    return { error: jsonError(503, 'service_unavailable', 'Service is temporarily unavailable.') }
-  }
-
-  const sessionToken = getSessionTokenFromRequest(request, env)
-  if (!sessionToken) {
-    return { error: jsonError(401, 'unauthorized', 'Sign in required.') }
-  }
-
-  const sessionUser = await getActiveSessionForToken(env.DB, sessionToken)
-  if (!sessionUser) {
-    return { error: jsonError(401, 'unauthorized', 'Sign in required.') }
-  }
-
-  const profile = await getUserProfileById(env.DB, sessionUser.id)
-  if (!profile) {
-    return { error: jsonError(401, 'unauthorized', 'Sign in required.') }
-  }
-
-  return { user: profile }
 }
 
 async function handleGetProfile(request, env) {

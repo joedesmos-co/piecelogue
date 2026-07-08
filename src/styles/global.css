@@ -1432,6 +1432,69 @@ a.btn--public:hover,
   margin: 0;
 }
 
+.cloud-status-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cloud-save-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--warning-subtle);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning);
+}
+
+.cloud-save-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cloud-save-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-heading);
+}
+
+.cloud-save-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.cloud-save-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.cloud-save-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  transition: width 0.2s ease;
+}
+
+.cloud-save-success {
+  font-size: 14px;
+  color: var(--success);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Modal ── */
 
 .modal-overlay {

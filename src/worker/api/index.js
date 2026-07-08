@@ -1,5 +1,6 @@
 import { notFound } from '../http.js'
 import { handleAuthRoute } from './auth.js'
+import { handleCloudRoute } from './cloud.js'
 import { handleHealth } from './health.js'
 import { handleProfileRoute } from './profile.js'
 
@@ -19,6 +20,11 @@ export async function handleApi(request, env) {
   const profileResponse = await handleProfileRoute(request, env, path)
   if (profileResponse) {
     return profileResponse
+  }
+
+  const cloudResponse = await handleCloudRoute(request, env, path)
+  if (cloudResponse) {
+    return cloudResponse
   }
 
   return notFound()
