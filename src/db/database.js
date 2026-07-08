@@ -78,3 +78,15 @@ db.version(3).stores({
     delete artwork.collection
   })
 })
+
+db.version(4).stores({
+  folders: 'id, parentFolderId, name, createdAt, updatedAt',
+  artworks:
+    'id, title, mediumType, medium, folderId, status, favorite, artworkDate, createdAt, updatedAt, totalMinutes',
+}).upgrade(async (tx) => {
+  await tx.table('folders').toCollection().modify((folder) => {
+    if (folder.parentFolderId === undefined) {
+      folder.parentFolderId = null
+    }
+  })
+})

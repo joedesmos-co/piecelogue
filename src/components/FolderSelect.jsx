@@ -6,6 +6,7 @@ export default function FolderSelect({
   folders = [],
   value,
   onChange,
+  noneLabel = 'No folder',
 }) {
   const listboxId = useId()
   const rootRef = useRef(null)
@@ -15,8 +16,11 @@ export default function FolderSelect({
   const [highlightIndex, setHighlightIndex] = useState(0)
 
   const options = [
-    { id: '', label: 'No folder' },
-    ...folders.map((folder) => ({ id: folder.id, label: folder.name })),
+    { id: '', label: noneLabel },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      label: folder.label || folder.name,
+    })),
   ]
 
   const selectedOption =

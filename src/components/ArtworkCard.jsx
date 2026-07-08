@@ -2,12 +2,12 @@ import { Heart, Clock, Folder } from 'lucide-react'
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getGalleryImageBlobs } from '../utils/imageUtils'
-import { getFolderName } from '../db/folderService'
+import { getFolderPathLabel } from '../utils/folderTree'
 import ArtworkImage from './ArtworkImage'
 
 export default function ArtworkCard({ artwork, folders = [], onClick }) {
   const imageBlobs = getGalleryImageBlobs(artwork)
-  const folderName = getFolderName(artwork.folderId, folders)
+  const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
 
   return (
     <button

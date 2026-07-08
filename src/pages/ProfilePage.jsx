@@ -3,6 +3,7 @@ import {
   BarChart3,
   CheckCircle,
   Clock,
+  Folder,
   Monitor,
   Paintbrush,
   Shapes,
@@ -30,7 +31,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
 
 export default function ProfilePage() {
   const { authenticated } = useAuth()
-  const { artworks } = useArtworks()
+  const { artworks, folders } = useArtworks()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -80,6 +81,12 @@ export default function ProfilePage() {
 
         {!loading && stats ? (
           <div className="stats-grid">
+            <StatCard
+              icon={Folder}
+              label="Folders"
+              value={folders.length}
+              accent="primary"
+            />
             <StatCard
               icon={BarChart3}
               label="Total artworks"

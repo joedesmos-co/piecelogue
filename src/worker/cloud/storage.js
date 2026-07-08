@@ -19,9 +19,17 @@ function normalizeFolder(folder) {
   return {
     id: folder.id,
     name,
+    parentFolderId: normalizeParentFolderId(folder.parentFolderId),
     createdAt: folder.createdAt,
     updatedAt: folder.updatedAt || folder.createdAt || nowIso(),
   }
+}
+
+function normalizeParentFolderId(parentFolderId) {
+  if (parentFolderId === '' || parentFolderId === undefined) {
+    return null
+  }
+  return parentFolderId
 }
 
 function normalizeArtworkMetadata(artwork) {
@@ -70,18 +78,25 @@ export async function upsertCloudFolders(db, userId, folders) {
       await db
         .prepare(
           `UPDATE folders
-           SET name = ?, updated_at = ?, deleted_at = NULL
+           SET name = ?, parent_folder_id = ?, updated_at = ?, deleted_at = NULL
            WHERE id = ? AND user_id = ?`,
         )
-        .bind(folder.name, folder.updatedAt, folder.id, userId)
+        .bind(folder.name, folder.parentFolderId, folder.updatedAt, folder.id, userId)
         .run()
     } else {
       await db
         .prepare(
-          `INSERT INTO folders (id, user_id, name, created_at, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, NULL)`,
+          `INSERT INTO folders (id, user_id, name, parent_folder_id, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
         )
-        .bind(folder.id, userId, folder.name, folder.createdAt, folder.updatedAt)
+        .bind(
+          folder.id,
+          userId,
+          folder.name,
+          folder.parentFolderId,
+          folder.createdAt,
+          folder.updatedAt,
+        )
         .run()
     }
 

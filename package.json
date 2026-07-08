@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test src/worker/**/*.test.js",
+    "test": "node --test $(find src -name '*.test.js' | sort)",
     "preview": "vite preview"
   },
   "dependencies": {

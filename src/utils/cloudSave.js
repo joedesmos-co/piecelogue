@@ -33,6 +33,7 @@ function toCloudFolder(folder) {
   return {
     id: folder.id,
     name: folder.name,
+    parentFolderId: folder.parentFolderId ?? null,
     createdAt: folder.createdAt,
     updatedAt: folder.updatedAt,
   }

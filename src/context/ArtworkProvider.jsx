@@ -75,20 +75,20 @@ export function ArtworkProvider({ children }) {
     return artwork
   }, [refresh])
 
-  const createFolder = useCallback(async (name) => {
-    const folder = await folderService.createFolder(name)
+  const createFolder = useCallback(async (name, parentFolderId = null) => {
+    const folder = await folderService.createFolder(name, parentFolderId)
     await refresh()
     return folder
   }, [refresh])
 
-  const renameFolder = useCallback(async (id, name) => {
-    const folder = await folderService.renameFolder(id, name)
+  const updateFolder = useCallback(async (id, { name, parentFolderId }) => {
+    const folder = await folderService.updateFolder(id, { name, parentFolderId })
     await refresh()
     return folder
   }, [refresh])
 
-  const removeFolder = useCallback(async (id) => {
-    const folder = await folderService.deleteFolder(id)
+  const removeFolder = useCallback(async (id, options) => {
+    const folder = await folderService.deleteFolder(id, options)
     await refresh()
     return folder
   }, [refresh])
@@ -104,7 +104,7 @@ export function ArtworkProvider({ children }) {
     removeArtwork,
     toggleFavorite,
     createFolder,
-    renameFolder,
+    updateFolder,
     removeFolder,
   }
 

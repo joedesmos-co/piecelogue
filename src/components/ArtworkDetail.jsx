@@ -13,7 +13,7 @@ import {
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getFullImageBlob, getFullImageBlobs } from '../utils/imageUtils'
-import { getFolderName } from '../db/folderService'
+import { getFolderPathLabel } from '../utils/folderTree'
 import ArtworkImage from './ArtworkImage'
 import ImageLightbox from './ImageLightbox'
 
@@ -40,7 +40,7 @@ export default function ArtworkDetail({
   const imageTriggerRef = useRef(null)
   const imageBlobs = getFullImageBlobs(artwork)
   const imageBlob = getFullImageBlob(artwork)
-  const folderName = getFolderName(artwork.folderId, folders)
+  const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
 
   const formattedDate = artwork.artworkDate
     ? new Date(artwork.artworkDate + 'T00:00:00').toLocaleDateString(undefined, {

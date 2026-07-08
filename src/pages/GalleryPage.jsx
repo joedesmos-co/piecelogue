@@ -1,13 +1,21 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, FolderPlus, ImageIcon } from 'lucide-react'
+import { FolderPlus, ImageIcon } from 'lucide-react'
 import { useArtworks } from '../hooks/useArtworks'
 import { GALLERY_VIEWS } from '../utils/constants'
+import {
+  getDescendantFolderIds,
+  getFolderBreadcrumbs,
+  getFolderPickerOptions,
+  normalizeParentFolderId,
+} from '../utils/folderTree'
 import ArtworkCard from '../components/ArtworkCard'
 import ArtworkDetail from '../components/ArtworkDetail'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DeleteFolderDialog from '../components/DeleteFolderDialog'
 import FolderCard from '../components/FolderCard'
 import FolderNameDialog from '../components/FolderNameDialog'
+import GalleryBreadcrumbs from '../components/GalleryBreadcrumbs'
 import GalleryContextMenu from '../components/GalleryContextMenu'
 
 export default function GalleryPage({ onAdd, onEdit }) {
@@ -19,7 +27,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
     removeArtwork,
     toggleFavorite,
     createFolder,
-    renameFolder,
+    updateFolder,
     removeFolder,
   } = useArtworks()
 
@@ -39,6 +47,20 @@ export default function GalleryPage({ onAdd, onEdit }) {
     [artworks],
   )
 
+  const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) || null
+  const currentFolderId = view === GALLERY_VIEWS.FOLDER ? selectedFolderId : null
+  const breadcrumbs = useMemo(
+    () => (selectedFolderId ? getFolderBreadcrumbs(selectedFolderId, folders) : []),
+    [selectedFolderId, folders],
+  )
+
+  const visibleChildFolders = useMemo(() => {
+    const parentId = view === GALLERY_VIEWS.FOLDER ? selectedFolderId : null
+    return folders.filter(
+      (folder) => normalizeParentFolderId(folder.parentFolderId) === parentId,
+    )
+  }, [folders, view, selectedFolderId])
+
   const visibleArtworks = useMemo(() => {
     switch (view) {
       case GALLERY_VIEWS.FOLDER:
@@ -51,9 +73,23 @@ export default function GalleryPage({ onAdd, onEdit }) {
     }
   }, [view, artworks, selectedFolderId, unfiledArtworks])
 
-  const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) || null
-  const currentFolderId =
-    view === GALLERY_VIEWS.FOLDER ? selectedFolderId : null
+  const createParentFolderId =
+    folderDialog?.mode === 'create'
+      ? folderDialog.parentFolderId ?? currentFolderId
+      : null
+
+  const renameParentOptions = useMemo(() => {
+    if (!folderDialog?.folder) {
+      return []
+    }
+
+    const excludeIds = [
+      folderDialog.folder.id,
+      ...getDescendantFolderIds(folderDialog.folder.id, folders),
+    ]
+
+    return getFolderPickerOptions(folders, { excludeFolderIds: excludeIds })
+  }, [folderDialog, folders])
 
   function openFolder(folderId) {
     setSelectedFolderId(folderId)
@@ -71,6 +107,18 @@ export default function GalleryPage({ onAdd, onEdit }) {
     setView(GALLERY_VIEWS.UNFILED)
     setSelectedFolderId(null)
     setSelectedArtwork(null)
+  }
+
+  function handleBreadcrumbNavigate(index) {
+    if (index < 0) {
+      goHome()
+      return
+    }
+
+    const crumb = breadcrumbs[index]
+    if (crumb) {
+      openFolder(crumb.id)
+    }
   }
 
   function handleGalleryContextMenu(event) {
@@ -107,34 +155,39 @@ export default function GalleryPage({ onAdd, onEdit }) {
     }
   }
 
-  async function handleCreateFolder(name) {
+  async function handleCreateFolder({ name, parentFolderId }) {
     setFolderSaving(true)
     try {
-      await createFolder(name)
+      await createFolder(name, parentFolderId)
       setFolderDialog(null)
     } finally {
       setFolderSaving(false)
     }
   }
 
-  async function handleRenameFolder(name) {
+  async function handleUpdateFolder({ name, parentFolderId }) {
     if (!folderDialog?.folder) return
     setFolderSaving(true)
     try {
-      await renameFolder(folderDialog.folder.id, name)
+      await updateFolder(folderDialog.folder.id, { name, parentFolderId })
       setFolderDialog(null)
     } finally {
       setFolderSaving(false)
     }
   }
 
-  async function handleDeleteFolder() {
+  async function handleDeleteFolder({ moveContentsTo }) {
     if (!deleteFolderTarget) return
     setDeletingFolder(true)
     try {
-      await removeFolder(deleteFolderTarget.id)
+      await removeFolder(deleteFolderTarget.id, { moveContentsTo })
       if (selectedFolderId === deleteFolderTarget.id) {
-        goHome()
+        const parentId = normalizeParentFolderId(deleteFolderTarget.parentFolderId)
+        if (parentId) {
+          openFolder(parentId)
+        } else {
+          goHome()
+        }
       }
       setDeleteFolderTarget(null)
     } catch {
@@ -181,10 +234,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
         ? 'Unfiled'
         : 'Gallery'
 
-  const showFolderSection = view === GALLERY_VIEWS.HOME
-
-  const showUnfiledHeading =
-    view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.UNFILED
+  const showFolderSection = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.FOLDER
+  const showUnfiledHeading = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.UNFILED
+  const topLevelFolderCount = folders.filter(
+    (folder) => normalizeParentFolderId(folder.parentFolderId) === null,
+  ).length
 
   return (
     <div
@@ -194,10 +248,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
       <header className="page-header gallery-header">
         <div className="gallery-header-main">
           {view === GALLERY_VIEWS.FOLDER ? (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={goHome}>
-              <ArrowLeft size={16} />
-              Back to Gallery
-            </button>
+            <GalleryBreadcrumbs crumbs={breadcrumbs} onNavigate={handleBreadcrumbNavigate} />
           ) : null}
           <div>
             <h2 className="page-title">{pageTitle}</h2>
@@ -218,11 +269,13 @@ export default function GalleryPage({ onAdd, onEdit }) {
           <button
             type="button"
             className="btn btn--secondary btn--sm"
-            onClick={() => setFolderDialog({ mode: 'create' })}
+            onClick={() =>
+              setFolderDialog({ mode: 'create', parentFolderId: currentFolderId })
+            }
             aria-label="Create new folder"
           >
             <FolderPlus size={16} />
-            New Folder
+            {view === GALLERY_VIEWS.FOLDER ? 'New Subfolder' : 'New Folder'}
           </button>
           {view === GALLERY_VIEWS.FOLDER && (
             <button
@@ -249,16 +302,22 @@ export default function GalleryPage({ onAdd, onEdit }) {
           {showFolderSection && (
             <section className="gallery-folders" aria-label="Folders">
               <div className="gallery-section-header">
-                <h3 className="gallery-section-title">Folders</h3>
+                <h3 className="gallery-section-title">
+                  {view === GALLERY_VIEWS.FOLDER ? 'Subfolders' : 'Folders'}
+                </h3>
               </div>
 
-              {folders.length === 0 ? (
+              {visibleChildFolders.length === 0 ? (
                 <div className="gallery-folders-empty">
-                  <p>No folders yet. Create one to organize your artwork.</p>
+                  <p>
+                    {view === GALLERY_VIEWS.FOLDER
+                      ? 'No subfolders yet.'
+                      : 'No folders yet. Create one to organize your artwork.'}
+                  </p>
                 </div>
               ) : (
                 <div className="folder-grid">
-                  {folders.map((folder) => (
+                  {visibleChildFolders.map((folder) => (
                     <FolderCard
                       key={folder.id}
                       folder={folder}
@@ -288,23 +347,25 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
             {visibleArtworks.length === 0 ? (
               view === GALLERY_VIEWS.FOLDER ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon" aria-hidden="true">
-                    <ImageIcon size={40} strokeWidth={1.5} />
+                visibleChildFolders.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-state-icon" aria-hidden="true">
+                      <ImageIcon size={40} strokeWidth={1.5} />
+                    </div>
+                    <h2 className="empty-state-title">This folder is empty</h2>
+                    <p className="empty-state-text">
+                      Add artwork to &ldquo;{selectedFolder?.name}&rdquo; or create a subfolder.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={() => onAdd(currentFolderId)}
+                    >
+                      Add Artwork to Folder
+                    </button>
                   </div>
-                  <h2 className="empty-state-title">This folder is empty</h2>
-                  <p className="empty-state-text">
-                    Add artwork to &ldquo;{selectedFolder?.name}&rdquo; or move existing pieces here.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    onClick={() => onAdd(currentFolderId)}
-                  >
-                    Add Artwork to Folder
-                  </button>
-                </div>
-              ) : view === GALLERY_VIEWS.HOME && folders.length === 0 ? (
+                ) : null
+              ) : view === GALLERY_VIEWS.HOME && topLevelFolderCount === 0 ? (
                 <EmptyState onAdd={() => onAdd(null)} />
               ) : (
                 <div className="empty-state">
@@ -334,7 +395,9 @@ export default function GalleryPage({ onAdd, onEdit }) {
         isOpen={folderDialog?.mode === 'create'}
         onClose={() => setFolderDialog(null)}
         onSubmit={handleCreateFolder}
-        title="New Folder"
+        title={view === GALLERY_VIEWS.FOLDER ? 'New Subfolder' : 'New Folder'}
+        initialParentFolderId={createParentFolderId}
+        parentOptions={getFolderPickerOptions(folders)}
         submitLabel="Create Folder"
         saving={folderSaving}
       />
@@ -342,20 +405,20 @@ export default function GalleryPage({ onAdd, onEdit }) {
       <FolderNameDialog
         isOpen={folderDialog?.mode === 'rename'}
         onClose={() => setFolderDialog(null)}
-        onSubmit={handleRenameFolder}
-        title="Rename Folder"
+        onSubmit={handleUpdateFolder}
+        title="Edit Folder"
         initialName={folderDialog?.folder?.name || ''}
+        initialParentFolderId={folderDialog?.folder?.parentFolderId ?? null}
+        parentOptions={renameParentOptions}
         submitLabel="Save"
         saving={folderSaving}
       />
 
-      <ConfirmDialog
+      <DeleteFolderDialog
         isOpen={Boolean(deleteFolderTarget)}
         onClose={() => setDeleteFolderTarget(null)}
         onConfirm={handleDeleteFolder}
-        title="Delete Folder"
-        message={`Delete "${deleteFolderTarget?.name}"? The ${deleteFolderTarget?.count || 0} artwork${deleteFolderTarget?.count === 1 ? '' : 's'} inside will be moved to Unfiled. The artwork will not be deleted.`}
-        confirmLabel={deletingFolder ? 'Deleting...' : 'Delete Folder'}
+        folder={deleteFolderTarget}
         busy={deletingFolder}
       />
 
@@ -364,7 +427,9 @@ export default function GalleryPage({ onAdd, onEdit }) {
         x={contextMenu?.x || 0}
         y={contextMenu?.y || 0}
         onClose={() => setContextMenu(null)}
-        onNewFolder={() => setFolderDialog({ mode: 'create' })}
+        onNewFolder={() =>
+          setFolderDialog({ mode: 'create', parentFolderId: currentFolderId })
+        }
       />
     </div>
   )

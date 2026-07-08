@@ -1,14 +1,21 @@
 import { useRef, useState } from 'react'
 import Modal from './Modal'
+import FolderSelect from './FolderSelect'
+import { normalizeParentFolderId } from '../utils/folderTree'
 
 function FolderNameForm({
   onClose,
   onSubmit,
   initialName = '',
+  initialParentFolderId = null,
+  parentOptions = [],
+  parentLabel = 'Parent folder',
+  allowParentSelection = true,
   submitLabel = 'Save',
   saving = false,
 }) {
   const [name, setName] = useState(initialName)
+  const [parentFolderId, setParentFolderId] = useState(initialParentFolderId || '')
   const [error, setError] = useState('')
   const inputRef = useRef(null)
 
@@ -17,7 +24,10 @@ function FolderNameForm({
     setError('')
 
     try {
-      await onSubmit(name)
+      await onSubmit({
+        name,
+        parentFolderId: normalizeParentFolderId(parentFolderId),
+      })
       onClose()
     } catch (err) {
       setError(err.message || 'Failed to save folder.')
@@ -26,11 +36,11 @@ function FolderNameForm({
 
   return (
     <form onSubmit={handleSubmit} className="folder-name-form">
-      {error && (
+      {error ? (
         <div className="form-error" role="alert">
           {error}
         </div>
-      )}
+      ) : null}
 
       <div className="form-group">
         <label htmlFor="folder-name" className="form-label form-label--required">
@@ -42,12 +52,22 @@ function FolderNameForm({
           type="text"
           className="form-input"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(event) => setName(event.target.value)}
           placeholder="e.g. Sketchbook 2026"
           required
           autoFocus
         />
       </div>
+
+      {allowParentSelection ? (
+        <FolderSelect
+          label={parentLabel}
+          folders={parentOptions}
+          value={parentFolderId || ''}
+          onChange={setParentFolderId}
+          noneLabel="Gallery (top level)"
+        />
+      ) : null}
 
       <div className="form-actions">
         <button
@@ -72,6 +92,10 @@ export default function FolderNameDialog({
   onSubmit,
   title,
   initialName = '',
+  initialParentFolderId = null,
+  parentOptions = [],
+  parentLabel = 'Parent folder',
+  allowParentSelection = true,
   submitLabel = 'Save',
   saving = false,
 }) {
@@ -79,8 +103,12 @@ export default function FolderNameDialog({
     <Modal isOpen={isOpen} onClose={onClose} title={title} className="modal--small">
       {isOpen ? (
         <FolderNameForm
-          key={`${title}-${initialName}`}
+          key={`${title}-${initialName}-${initialParentFolderId || 'root'}`}
           initialName={initialName}
+          initialParentFolderId={initialParentFolderId}
+          parentOptions={parentOptions}
+          parentLabel={parentLabel}
+          allowParentSelection={allowParentSelection}
           onClose={onClose}
           onSubmit={onSubmit}
           submitLabel={submitLabel}

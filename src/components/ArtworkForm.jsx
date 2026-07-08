@@ -7,6 +7,7 @@ import {
   resolveMediumType,
 } from '../utils/constants'
 import { calculateTotalMinutes } from '../utils/formatTime'
+import { getFolderPickerOptions } from '../utils/folderTree'
 import { getFullImageBlobs, isValidImageFile } from '../utils/imageUtils'
 import ArtworkImage from './ArtworkImage'
 import SegmentedControl from './SegmentedControl'
@@ -42,6 +43,8 @@ export default function ArtworkForm({
     if (!imageFile) return null
     return URL.createObjectURL(imageFile)
   }, [imageFile])
+
+  const folderOptions = useMemo(() => getFolderPickerOptions(folders), [folders])
 
   useEffect(() => {
     return () => {
@@ -219,7 +222,7 @@ export default function ArtworkForm({
       </div>
 
       <FolderSelect
-        folders={folders}
+        folders={folderOptions}
         value={folderId || ''}
         onChange={setFolderId}
       />

@@ -63,6 +63,9 @@ export default function FolderCard({
           <h3 className="folder-card-title">{folder.name}</h3>
           <p className="folder-card-count">
             {folder.count} artwork{folder.count !== 1 ? 's' : ''}
+            {folder.childCount > 0
+              ? ` · ${folder.childCount} subfolder${folder.childCount !== 1 ? 's' : ''}`
+              : ''}
           </p>
         </div>
       </button>
