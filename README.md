@@ -85,20 +85,34 @@ npx wrangler r2 bucket create piecelogue-artworks
 
 Replace `bucket_name` in `wrangler.jsonc` with the exact created bucket name.
 
-## Auth backend (Phase 1)
+## Auth backend
 
-Passwordless email magic-link authentication is implemented in the Worker API. The React app and IndexedDB artwork behavior are unchanged in this phase.
+Google OAuth is the primary production sign-in method. Email magic-link auth remains in the Worker as a future fallback (requires Cloudflare Email Sending / Workers Paid).
 
 ### API routes
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/auth/request-link` | Request a magic sign-in link |
-| `GET` | `/api/auth/verify?token=...` | Consume link, create session, redirect to `/app?auth=success` |
+| `GET` | `/api/auth/google/start` | Start Google OAuth (redirect to Google) |
+| `GET` | `/api/auth/google/callback` | Complete Google OAuth, create session |
+| `POST` | `/api/auth/request-link` | Request a magic sign-in link (dev / future email) |
+| `GET` | `/api/auth/verify?token=...` | Consume magic link, create session |
 | `GET` | `/api/auth/me` | Return current signed-in user or `authenticated: false` |
 | `POST` | `/api/auth/logout` | Revoke session and clear cookie |
 
-Sessions are opaque server-side records in D1, stored in the `__Host-piecelogue_session` HttpOnly cookie. Raw tokens are never returned in production responses.
+Sessions are opaque server-side records in D1, stored in the `__Host-piecelogue_session` HttpOnly cookie.
+
+### Production Google OAuth setup
+
+Full checklist: **[docs/GOOGLE_OAUTH.md](docs/GOOGLE_OAUTH.md)**
+
+Redirect URI: `https://piecelogue.com/api/auth/google/callback`
+
+```bash
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npm run build && npx wrangler deploy
+```
 
 ### Apply auth migration locally
 
@@ -116,12 +130,8 @@ Create `.dev.vars` (not committed):
 AUTH_DEV_MODE=true
 APP_ORIGIN=http://localhost:8787
 ENVIRONMENT=development
-```
-
-Optional for real email delivery:
-
-```bash
-AUTH_FROM_EMAIL=noreply@your-verified-domain.com
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-client-secret
 ```
 
 Run the Worker locally:
@@ -145,18 +155,9 @@ Verify session:
 curl -s http://localhost:8787/api/auth/me -H 'Cookie: __Host-piecelogue_session=YOUR_TOKEN'
 ```
 
-### Production email setup
+### Future production email setup (magic-link fallback)
 
-Full checklist: **[docs/PRODUCTION_EMAIL.md](docs/PRODUCTION_EMAIL.md)**
-
-Summary:
-
-1. **Email Sending** → onboard `piecelogue.com` (Cloudflare DNS required)
-2. **`EMAIL` binding** — already enabled in `wrangler.jsonc` as `send_email`
-3. **Secret** — `npx wrangler secret put AUTH_FROM_EMAIL` (e.g. `noreply@piecelogue.com`)
-4. **Do not set** `AUTH_DEV_MODE` in production
-5. Apply migration: `npx wrangler d1 migrations apply piecelogue --remote`
-6. Deploy: `npm run build && npx wrangler deploy`
+Full checklist: **[docs/PRODUCTION_EMAIL.md](docs/PRODUCTION_EMAIL.md)** — requires Cloudflare Email Sending (Workers Paid).
 
 ## Data storage
 

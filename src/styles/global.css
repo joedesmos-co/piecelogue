@@ -1381,6 +1381,17 @@ a.btn--public:hover,
   gap: 6px;
 }
 
+.account-sign-in-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.account-google-btn {
+  text-decoration: none;
+}
+
 .sign-in-success {
   display: flex;
   flex-direction: column;

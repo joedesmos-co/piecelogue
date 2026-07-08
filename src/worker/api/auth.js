@@ -15,6 +15,7 @@ import {
   revokeSessionForToken,
 } from '../auth/sessions.js'
 import { sendMagicLinkEmail, isDevMode, buildMagicLinkUrl } from '../email/sendMagicLinkEmail.js'
+import { handleGoogleCallback, handleGoogleStart } from './googleAuth.js'
 import { jsonError, jsonOk, methodNotAllowed } from '../http.js'
 
 const GENERIC_REQUEST_LINK_MESSAGE =
@@ -268,6 +269,10 @@ export async function handleAuthRoute(request, env, path) {
       return handleMe(request, env)
     case '/api/auth/logout':
       return handleLogout(request, env)
+    case '/api/auth/google/start':
+      return handleGoogleStart(request, env)
+    case '/api/auth/google/callback':
+      return handleGoogleCallback(request, env)
     default:
       return null
   }

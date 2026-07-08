@@ -5,7 +5,7 @@ import SignInDialog from './SignInDialog'
 
 export default function AccountSection() {
   const { authenticated, user, loading, error, signOut } = useAuth()
-  const [showSignIn, setShowSignIn] = useState(false)
+  const [showDevSignIn, setShowDevSignIn] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
 
@@ -70,13 +70,20 @@ export default function AccountSection() {
               <p className="settings-text settings-text--muted">
                 Sign in to link your account. Cloud sync is not available yet.
               </p>
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() => setShowSignIn(true)}
-              >
-                Sign in
-              </button>
+              <div className="account-sign-in-options">
+                <a href="/api/auth/google/start" className="btn btn--primary account-google-btn">
+                  Continue with Google
+                </a>
+                {import.meta.env.DEV ? (
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    onClick={() => setShowDevSignIn(true)}
+                  >
+                    Development email login
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </div>
@@ -92,7 +99,7 @@ export default function AccountSection() {
         </div>
       </section>
 
-      <SignInDialog isOpen={showSignIn} onClose={() => setShowSignIn(false)} />
+      <SignInDialog isOpen={showDevSignIn} onClose={() => setShowDevSignIn(false)} />
     </>
   )
 }

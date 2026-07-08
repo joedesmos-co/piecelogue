@@ -33,9 +33,12 @@
       "name": "EMAIL"
     }
   ]
-  // Optional hardening after domain verification (must match AUTH_FROM_EMAIL):
-  // "allowed_sender_addresses": ["noreply@piecelogue.com"]
+  // Production secrets:
+  // npx wrangler secret put GOOGLE_CLIENT_ID
+  // npx wrangler secret put GOOGLE_CLIENT_SECRET
+  //
+  // Optional future magic-link email:
+  // npx wrangler secret put AUTH_FROM_EMAIL
   //
   // Local dev: keep AUTH_DEV_MODE=true in .dev.vars (never set in production).
-  // Production secret: npx wrangler secret put AUTH_FROM_EMAIL
 }
