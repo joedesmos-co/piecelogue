@@ -41,8 +41,6 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
   const visibleArtworks = useMemo(() => {
     switch (view) {
-      case GALLERY_VIEWS.ALL:
-        return artworks
       case GALLERY_VIEWS.FOLDER:
         return artworks.filter((artwork) => artwork.folderId === selectedFolderId)
       case GALLERY_VIEWS.UNFILED:
@@ -65,12 +63,6 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
   function goHome() {
     setView(GALLERY_VIEWS.HOME)
-    setSelectedFolderId(null)
-    setSelectedArtwork(null)
-  }
-
-  function showAllArtwork() {
-    setView(GALLERY_VIEWS.ALL)
     setSelectedFolderId(null)
     setSelectedArtwork(null)
   }
@@ -185,14 +177,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const pageTitle =
     view === GALLERY_VIEWS.FOLDER
       ? selectedFolder?.name || 'Folder'
-      : view === GALLERY_VIEWS.ALL
-        ? 'All Artwork'
-        : view === GALLERY_VIEWS.UNFILED
-          ? 'Unfiled'
-          : 'Gallery'
+      : view === GALLERY_VIEWS.UNFILED
+        ? 'Unfiled'
+        : 'Gallery'
 
-  const showFolderSection =
-    view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.ALL
+  const showFolderSection = view === GALLERY_VIEWS.HOME
 
   const showUnfiledHeading =
     view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.UNFILED
@@ -221,16 +210,6 @@ export default function GalleryPage({ onAdd, onEdit }) {
         </div>
 
         <div className="gallery-toolbar">
-          {view !== GALLERY_VIEWS.ALL && view !== GALLERY_VIEWS.FOLDER && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={showAllArtwork}>
-              All artwork
-            </button>
-          )}
-          {view === GALLERY_VIEWS.ALL && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={goHome}>
-              Back to folders
-            </button>
-          )}
           {view !== GALLERY_VIEWS.UNFILED && view !== GALLERY_VIEWS.FOLDER && unfiledArtworks.length > 0 && (
             <button type="button" className="btn btn--ghost btn--sm" onClick={showUnfiled}>
               Unfiled ({unfiledArtworks.length})

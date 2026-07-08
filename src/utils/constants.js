@@ -33,7 +33,6 @@ export const PAGES = {
 
 export const GALLERY_VIEWS = {
   HOME: 'home',
-  ALL: 'all',
   FOLDER: 'folder',
   UNFILED: 'unfiled',
 }

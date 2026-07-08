@@ -34,7 +34,7 @@ export default function AppShell({
         </header>
 
         <main className="app-content">
-          {children}
+          <div className="app-page">{children}</div>
           <SiteFooter />
         </main>
 
