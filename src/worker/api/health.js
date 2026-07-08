@@ -8,10 +8,14 @@ export function handleHealth(request) {
     return methodNotAllowed(['GET'])
   }
 
-  return jsonOk({
-    ok: true,
-    app: APP_NAME,
-    version: VERSION,
-  })
+  return jsonOk(
+    {
+      ok: true,
+      app: APP_NAME,
+      version: VERSION,
+    },
+    200,
+    { 'x-piecelogue-api': 'health' },
+  )
 }
 

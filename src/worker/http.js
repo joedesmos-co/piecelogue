@@ -8,8 +8,8 @@ function jsonBody(body, status = 200, headers = {}) {
   })
 }
 
-export function jsonOk(body, status = 200) {
-  return jsonBody(body, status)
+export function jsonOk(body, status = 200, headers = {}) {
+  return jsonBody(body, status, headers)
 }
 
 export function jsonError(status, code, message, details = null) {
