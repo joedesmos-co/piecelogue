@@ -24,7 +24,16 @@ function setLinkTag(rel, href) {
   element.setAttribute('href', href)
 }
 
-export function applyPageSeo({ title, description, path, ogType = 'website' }) {
+export function setRobotsMeta(content) {
+  if (content) {
+    setMetaTag('name', 'robots', content)
+    return
+  }
+
+  document.head.querySelector('meta[name="robots"]')?.remove()
+}
+
+export function applyPageSeo({ title, description, path, ogType = 'website', robots = null }) {
   const canonicalUrl = getCanonicalUrl(path)
 
   document.title = title
@@ -40,6 +49,8 @@ export function applyPageSeo({ title, description, path, ogType = 'website' }) {
   setMetaTag('name', 'twitter:card', 'summary')
   setMetaTag('name', 'twitter:title', title)
   setMetaTag('name', 'twitter:description', description)
+
+  setRobotsMeta(robots)
 }
 
 export function setJsonLd(id, data) {

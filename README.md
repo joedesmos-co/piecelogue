@@ -4,6 +4,17 @@ A local-first web app for artists to log artwork, organize pieces into folders, 
 
 **Live site:** [piecelogue.com](https://piecelogue.com)
 
+## Routes
+
+| Path | Purpose |
+|---|---|
+| `/` | Public landing page |
+| `/app` | Local-first Piecelogue application |
+| `/about` | About page |
+| `/privacy` | Privacy Policy |
+| `/terms` | Terms of Service |
+| `/contact` | Contact page |
+
 ## Features
 
 - Gallery with artwork cards and full-screen image lightbox
@@ -11,7 +22,7 @@ A local-first web app for artists to log artwork, organize pieces into folders, 
 - Add, edit, and delete artwork with images, medium details, time tracking, and notes
 - Statistics page for lifetime creative metrics
 - Settings with local storage information
-- Public pages: About, Privacy, Terms, Contact
+- Public landing page and informational pages
 
 ## Tech stack
 
@@ -39,7 +50,7 @@ Static files (`sitemap.xml`, `robots.txt`, `ads.txt`) are copied from `public/` 
 
 ## Data storage
 
-The current version stores all artwork images and metadata locally in your browser. There is no cloud sync or user accounts yet. Clearing browser data may remove your library.
+The current version stores all artwork images and metadata locally in your browser. There is no cloud sync or user accounts yet. Clearing browser data may remove your library. The app at `/app` uses the same origin IndexedDB as before — moving routes does not reset data.
 
 ## License
 

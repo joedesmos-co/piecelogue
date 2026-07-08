@@ -1,17 +1,19 @@
 import { APP_NAME, APP_TAGLINE } from '../utils/constants'
+import { APP_ROUTE } from '../utils/site'
+import NavLink from './NavLink'
 import SiteFooter from './SiteFooter'
 
 export default function PublicPageLayout({ title, children }) {
   return (
     <div className="public-site">
       <header className="public-header">
-        <a href="/" className="public-brand">
+        <NavLink href="/" className="public-brand">
           <span className="public-brand-name">{APP_NAME}</span>
           <span className="public-brand-tagline">{APP_TAGLINE}</span>
-        </a>
-        <a href="/" className="btn btn--secondary btn--sm public-open-app">
+        </NavLink>
+        <NavLink href={APP_ROUTE} className="btn btn--secondary btn--sm public-open-app">
           Open App
-        </a>
+        </NavLink>
       </header>
 
       <main className="public-main">
@@ -21,7 +23,7 @@ export default function PublicPageLayout({ title, children }) {
         </article>
       </main>
 
-      <SiteFooter />
+      <SiteFooter variant="full" />
     </div>
   )
 }

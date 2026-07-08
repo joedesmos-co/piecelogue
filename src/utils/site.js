@@ -5,6 +5,8 @@ export const ADSENSE_PUBLISHER_ID = 'ca-pub-8017727208750483'
 export const ADSENSE_SCRIPT_SRC =
   `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUBLISHER_ID}`
 
+export const APP_ROUTE = '/app'
+
 export const PUBLIC_ROUTES = {
   ABOUT: '/about',
   PRIVACY: '/privacy',
@@ -15,10 +17,17 @@ export const PUBLIC_ROUTES = {
 export const PAGE_SEO = {
   home: {
     path: '/',
-    title: 'Piecelogue — Log Your Art, Track Your Journey',
+    title: 'Piecelogue — Log Your Art and Track Your Creative Journey',
     description:
-      'Piecelogue is a local-first app for logging, organizing, viewing, and tracking your creative artwork and progress. Save pieces, use folders, and review lifetime stats in your browser.',
+      'Piecelogue helps artists log artwork, organize pieces into folders, track time spent creating, and build a personal record of creative progress in the browser.',
     ogType: 'website',
+  },
+  app: {
+    path: '/app',
+    title: 'Piecelogue',
+    description: 'Open Piecelogue to log artwork and track your creative journey.',
+    ogType: 'website',
+    robots: 'noindex, nofollow',
   },
   about: {
     path: '/about',
@@ -50,19 +59,22 @@ export const PAGE_SEO = {
   },
 }
 
+const PUBLIC_ROUTE_MAP = {
+  [PUBLIC_ROUTES.ABOUT]: 'about',
+  [PUBLIC_ROUTES.PRIVACY]: 'privacy',
+  [PUBLIC_ROUTES.TERMS]: 'terms',
+  [PUBLIC_ROUTES.CONTACT]: 'contact',
+}
+
+export function resolveSiteRoute(pathname) {
+  if (pathname === '/') return 'landing'
+  if (pathname === APP_ROUTE) return 'app'
+  return PUBLIC_ROUTE_MAP[pathname] ?? 'landing'
+}
+
+/** @deprecated Use resolveSiteRoute */
 export function resolvePublicRoute(pathname) {
-  switch (pathname) {
-    case PUBLIC_ROUTES.ABOUT:
-      return 'about'
-    case PUBLIC_ROUTES.PRIVACY:
-      return 'privacy'
-    case PUBLIC_ROUTES.TERMS:
-      return 'terms'
-    case PUBLIC_ROUTES.CONTACT:
-      return 'contact'
-    default:
-      return null
-  }
+  return PUBLIC_ROUTE_MAP[pathname] ?? null
 }
 
 export function getCanonicalUrl(path) {
