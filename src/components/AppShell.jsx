@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { APP_NAME, APP_TAGLINE } from '../utils/constants'
 import { BottomNav, Sidebar } from './Navigation'
+import SiteFooter from './SiteFooter'
 
 export default function AppShell({
   currentPage,
@@ -32,7 +33,10 @@ export default function AppShell({
           </button>
         </header>
 
-        <main className="app-content">{children}</main>
+        <main className="app-content">
+          {children}
+          <SiteFooter />
+        </main>
 
         <BottomNav
           currentPage={currentPage}

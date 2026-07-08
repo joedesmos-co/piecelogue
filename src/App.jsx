@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArtworkProvider } from './context/ArtworkProvider'
 import { useArtworks } from './hooks/useArtworks'
+import { usePublicRoute } from './hooks/usePublicRoute'
 import AppShell from './components/AppShell'
 import Modal from './components/Modal'
 import ArtworkForm from './components/ArtworkForm'
 import GalleryPage from './pages/GalleryPage'
 import StatsPage from './pages/StatsPage'
 import SettingsPage from './pages/SettingsPage'
+import PublicSite from './pages/public/PublicSite'
+import HomeStructuredData from './components/HomeStructuredData'
 import { PAGES } from './utils/constants'
+import { applyPageSeo } from './utils/seo'
+import { PAGE_SEO } from './utils/site'
 
 function AppContent() {
   const { addArtwork, editArtwork, folders } = useArtworks()
@@ -16,6 +21,10 @@ function AppContent() {
   const [editingArtwork, setEditingArtwork] = useState(null)
   const [defaultFolderId, setDefaultFolderId] = useState(null)
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    applyPageSeo(PAGE_SEO.home)
+  }, [])
 
   function handleAdd(folderId = null) {
     setEditingArtwork(null)
@@ -63,6 +72,7 @@ function AppContent() {
 
   return (
     <>
+      <HomeStructuredData />
       <AppShell
         currentPage={currentPage}
         onNavigate={setCurrentPage}
@@ -92,6 +102,12 @@ function AppContent() {
 }
 
 export default function App() {
+  const publicRoute = usePublicRoute()
+
+  if (publicRoute) {
+    return <PublicSite route={publicRoute} />
+  }
+
   return (
     <ArtworkProvider>
       <AppContent />
