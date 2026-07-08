@@ -7,6 +7,10 @@
   background: var(--bg);
 }
 
+.landing-page > main {
+  flex: 1;
+}
+
 /* Header */
 .landing-header {
   position: sticky;
@@ -37,6 +41,10 @@
   text-decoration: none;
   color: inherit;
   border-radius: var(--radius-sm);
+}
+
+.landing-brand:hover {
+  text-decoration: none;
 }
 
 .landing-brand:focus-visible {
@@ -70,6 +78,7 @@
 .landing-nav-link:hover {
   color: var(--text-heading);
   background: var(--bg-subtle);
+  text-decoration: none;
 }
 
 .landing-nav-link:focus-visible {
@@ -117,6 +126,7 @@
 
 .landing-mobile-menu-link:hover {
   background: var(--bg-subtle);
+  text-decoration: none;
 }
 
 .landing-mobile-menu-link:focus-visible {
@@ -190,7 +200,6 @@
 
 .landing-hero-cta {
   min-height: 44px;
-  padding-inline: 20px;
 }
 
 .landing-hero-preview {
@@ -602,7 +611,8 @@
 }
 
 .landing-local-link:hover {
-  text-decoration: underline;
+  color: var(--accent-hover);
+  text-decoration: none;
 }
 
 .landing-local-link:focus-visible {
@@ -634,50 +644,7 @@
 }
 
 .landing-final-btn {
-  min-height: 48px;
-  padding-inline: 28px;
-  font-size: 16px;
-}
-
-/* Full footer variant */
-.site-footer--full {
-  margin-top: auto;
-  padding: 32px 16px 24px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-elevated);
-}
-
-.site-footer-brand {
-  margin-bottom: 16px;
-}
-
-.site-footer-brand-name {
-  display: inline-block;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-heading);
-  text-decoration: none;
-  border-radius: var(--radius-sm);
-}
-
-.site-footer-brand-name:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.site-footer-brand-tagline {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.site-footer-link--accent {
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.site-footer-link--accent:hover {
-  color: var(--accent-hover);
+  font-size: 15px;
 }
 
 /* App loading */

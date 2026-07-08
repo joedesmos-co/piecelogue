@@ -14,7 +14,7 @@ export default function SiteFooter({ variant = 'compact' }) {
     <footer className={`site-footer ${variant === 'full' ? 'site-footer--full' : ''}`}>
       {variant === 'full' && (
         <div className="site-footer-brand">
-          <NavLink href="/" className="site-footer-brand-name">
+          <NavLink href="/" className="site-footer-brand-name" aria-label={`${APP_NAME} home`}>
             {APP_NAME}
           </NavLink>
           <p className="site-footer-brand-tagline">{APP_TAGLINE}</p>

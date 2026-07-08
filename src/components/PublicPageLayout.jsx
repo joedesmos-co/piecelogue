@@ -7,11 +7,11 @@ export default function PublicPageLayout({ title, children }) {
   return (
     <div className="public-site">
       <header className="public-header">
-        <NavLink href="/" className="public-brand">
+        <NavLink href="/" className="public-brand" aria-label={`${APP_NAME} home`}>
           <span className="public-brand-name">{APP_NAME}</span>
           <span className="public-brand-tagline">{APP_TAGLINE}</span>
         </NavLink>
-        <NavLink href={APP_ROUTE} className="btn btn--secondary btn--sm public-open-app">
+        <NavLink href={APP_ROUTE} className="btn btn--public btn--secondary btn--sm public-open-app">
           Open App
         </NavLink>
       </header>

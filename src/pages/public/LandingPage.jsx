@@ -91,10 +91,10 @@ export default function LandingPage() {
               over time.
             </p>
             <div className="landing-hero-actions">
-              <NavLink href={APP_ROUTE} className="btn btn--primary landing-hero-cta">
+              <NavLink href={APP_ROUTE} className="btn btn--public btn--primary landing-hero-cta">
                 Open Piecelogue
               </NavLink>
-              <NavLink href="#how-it-works" className="btn btn--secondary landing-hero-cta">
+              <NavLink href="#how-it-works" className="btn btn--public btn--secondary landing-hero-cta">
                 See how it works
               </NavLink>
             </div>
@@ -161,7 +161,7 @@ export default function LandingPage() {
           </ol>
 
           <div className="landing-section-cta">
-            <NavLink href={APP_ROUTE} className="btn btn--primary">
+            <NavLink href={APP_ROUTE} className="btn btn--public btn--primary">
               Start logging your art
             </NavLink>
           </div>
@@ -202,7 +202,7 @@ export default function LandingPage() {
             Start building a personal history of the pieces you create and the time
             you spend creating them.
           </p>
-          <NavLink href={APP_ROUTE} className="btn btn--primary landing-final-btn">
+          <NavLink href={APP_ROUTE} className="btn btn--public btn--primary landing-final-btn">
             Open Piecelogue
           </NavLink>
         </section>

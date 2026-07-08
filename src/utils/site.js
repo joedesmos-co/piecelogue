@@ -57,6 +57,12 @@ export const PAGE_SEO = {
       'Contact Piecelogue for support, privacy questions, and general inquiries.',
     ogType: 'website',
   },
+  notFound: {
+    title: 'Page Not Found — Piecelogue',
+    description: 'The page you are looking for does not exist or may have moved.',
+    ogType: 'website',
+    robots: 'noindex, nofollow',
+  },
 }
 
 const PUBLIC_ROUTE_MAP = {
@@ -69,7 +75,7 @@ const PUBLIC_ROUTE_MAP = {
 export function resolveSiteRoute(pathname) {
   if (pathname === '/') return 'landing'
   if (pathname === APP_ROUTE) return 'app'
-  return PUBLIC_ROUTE_MAP[pathname] ?? 'landing'
+  return PUBLIC_ROUTE_MAP[pathname] ?? 'not-found'
 }
 
 /** @deprecated Use resolveSiteRoute */

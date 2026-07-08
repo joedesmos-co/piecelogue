@@ -46,7 +46,12 @@ export default function NavLink({
   }
 
   return (
-    <a href={href} className={className} onClick={handleClick} {...props}>
+    <a
+      href={href}
+      className={className ? `nav-link ${className}` : 'nav-link'}
+      onClick={handleClick}
+      {...props}
+    >
       {children}
     </a>
   )

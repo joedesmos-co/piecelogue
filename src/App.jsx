@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { useSiteRoute } from './hooks/useSiteRoute'
 import LandingPage from './pages/public/LandingPage'
+import NotFoundPage from './pages/public/NotFoundPage'
 import PublicSite from './pages/public/PublicSite'
 
 const LocalApp = lazy(() => import('./LocalApp.jsx'))
@@ -34,5 +35,5 @@ export default function App() {
     return <PublicSite route={route} />
   }
 
-  return <LandingPage />
+  return <NotFoundPage />
 }

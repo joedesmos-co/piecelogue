@@ -60,13 +60,13 @@ export default function LandingHeader() {
               {label}
             </NavLink>
           ))}
-          <NavLink href={APP_ROUTE} className="btn btn--primary btn--sm landing-nav-cta">
+          <NavLink href={APP_ROUTE} className="btn btn--public btn--primary btn--sm landing-nav-cta">
             Open Piecelogue
           </NavLink>
         </nav>
 
         <div className="landing-nav-mobile">
-          <NavLink href={APP_ROUTE} className="btn btn--primary btn--sm landing-nav-cta-mobile">
+          <NavLink href={APP_ROUTE} className="btn btn--public btn--primary btn--sm landing-nav-cta-mobile">
             Open
           </NavLink>
           <button
@@ -102,7 +102,7 @@ export default function LandingHeader() {
           ))}
           <NavLink
             href={APP_ROUTE}
-            className="btn btn--primary landing-mobile-menu-cta"
+            className="btn btn--public btn--primary landing-mobile-menu-cta"
             onClick={closeMenu}
           >
             Open Piecelogue
