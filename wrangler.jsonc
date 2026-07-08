@@ -25,14 +25,17 @@
   "vars": {
     "APP_ORIGIN": "https://piecelogue.com",
     "ENVIRONMENT": "production"
-  }
-  // Email sending (configure before enabling magic links in production):
-  // "send_email": [
-  //   {
-  //     "name": "EMAIL",
-  //     "allowed_destination_addresses": ["*"]
-  //   }
-  // ]
-  // Set AUTH_FROM_EMAIL in the dashboard or .dev.vars (not committed).
-  // For local dev only: AUTH_DEV_MODE=true reveals magic links in API responses.
+  },
+  // Cloudflare Email Service binding for magic-link auth in production.
+  // See docs/PRODUCTION_EMAIL.md for dashboard setup before first deploy.
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ]
+  // Optional hardening after domain verification (must match AUTH_FROM_EMAIL):
+  // "allowed_sender_addresses": ["noreply@piecelogue.com"]
+  //
+  // Local dev: keep AUTH_DEV_MODE=true in .dev.vars (never set in production).
+  // Production secret: npx wrangler secret put AUTH_FROM_EMAIL
 }

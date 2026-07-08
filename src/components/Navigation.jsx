@@ -1,9 +1,9 @@
-import { Images, BarChart3, Settings, Plus } from 'lucide-react'
+import { Images, User, Settings, Plus } from 'lucide-react'
 import { APP_NAME, PAGES } from '../utils/constants'
 
 const NAV_ITEMS = [
   { id: PAGES.GALLERY, label: 'Gallery', icon: Images },
-  { id: PAGES.STATS, label: 'Stats', icon: BarChart3 },
+  { id: PAGES.PROFILE, label: 'Profile', icon: User },
   { id: PAGES.SETTINGS, label: 'Settings', icon: Settings },
 ]
 

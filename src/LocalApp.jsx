@@ -6,7 +6,7 @@ import AppShell from './components/AppShell'
 import Modal from './components/Modal'
 import ArtworkForm from './components/ArtworkForm'
 import GalleryPage from './pages/GalleryPage'
-import StatsPage from './pages/StatsPage'
+import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import { PAGES } from './utils/constants'
 import { applyPageSeo } from './utils/seo'
@@ -58,8 +58,8 @@ function AppContent() {
 
   function renderPage() {
     switch (currentPage) {
-      case PAGES.STATS:
-        return <StatsPage />
+      case PAGES.PROFILE:
+        return <ProfilePage />
       case PAGES.SETTINGS:
         return <SettingsPage />
       case PAGES.GALLERY:

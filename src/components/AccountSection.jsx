@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Cloud, LogOut, User } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import SignInDialog from './SignInDialog.jsx'
+import SignInDialog from './SignInDialog'
 
 export default function AccountSection() {
   const { authenticated, user, loading, error, signOut } = useAuth()

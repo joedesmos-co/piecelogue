@@ -27,7 +27,7 @@ export const STATUSES = ['In Progress', 'Finished']
 
 export const PAGES = {
   GALLERY: 'gallery',
-  STATS: 'stats',
+  PROFILE: 'profile',
   SETTINGS: 'settings',
 }
 

@@ -145,13 +145,18 @@ Verify session:
 curl -s http://localhost:8787/api/auth/me -H 'Cookie: __Host-piecelogue_session=YOUR_TOKEN'
 ```
 
-### Production email setup (manual)
+### Production email setup
 
-1. Enable the Cloudflare `send_email` binding as `EMAIL` in `wrangler.jsonc`
-2. Set `AUTH_FROM_EMAIL` in the Cloudflare dashboard or secrets
-3. Set `AUTH_DEV_MODE` to false or remove it
-4. Apply migration: `npx wrangler d1 migrations apply piecelogue --remote`
-5. Deploy: `npm run build && npx wrangler deploy`
+Full checklist: **[docs/PRODUCTION_EMAIL.md](docs/PRODUCTION_EMAIL.md)**
+
+Summary:
+
+1. **Email Sending** → onboard `piecelogue.com` (Cloudflare DNS required)
+2. **`EMAIL` binding** — already enabled in `wrangler.jsonc` as `send_email`
+3. **Secret** — `npx wrangler secret put AUTH_FROM_EMAIL` (e.g. `noreply@piecelogue.com`)
+4. **Do not set** `AUTH_DEV_MODE` in production
+5. Apply migration: `npx wrangler d1 migrations apply piecelogue --remote`
+6. Deploy: `npm run build && npx wrangler deploy`
 
 ## Data storage
 

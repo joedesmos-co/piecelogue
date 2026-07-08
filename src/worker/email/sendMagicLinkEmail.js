@@ -61,9 +61,8 @@ export async function sendMagicLinkEmail(env, email, rawToken, request) {
   }
 
   await env.EMAIL.send({
-    type: 'text',
     from: { email: fromEmail, name: 'Piecelogue' },
-    to: [{ email }],
+    to: { email },
     subject: 'Sign in to Piecelogue',
     text: [
       'Use this link to sign in to Piecelogue:',
