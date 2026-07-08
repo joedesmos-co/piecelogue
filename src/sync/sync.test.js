@@ -6,8 +6,10 @@ import { shouldUploadImage } from '../sync/imageHash.js'
 import {
   buildCoalescedJob,
   filterJobsForActiveUser,
+  isDeleteSyncEntityType,
   sortSyncJobs,
 } from '../sync/queueLogic.js'
+import { SYNC_ENTITY_TYPES } from '../sync/constants.js'
 import {
   buildRetryUpdate,
   classifySyncError,
@@ -50,14 +52,64 @@ describe('sync queue coalescing', () => {
 
   it('orders jobs folders -> artwork metadata -> images', () => {
     const jobs = sortSyncJobs([
-      { priority: 3, createdAt: '2026-07-08T10:00:00.000Z' },
-      { priority: 1, createdAt: '2026-07-08T12:00:00.000Z' },
-      { priority: 2, createdAt: '2026-07-08T11:00:00.000Z' },
-      { priority: 1, createdAt: '2026-07-08T09:00:00.000Z' },
+      { priority: 3, createdAt: '2026-07-08T10:00:00.000Z', entityType: 'artwork-image' },
+      { priority: 1, createdAt: '2026-07-08T12:00:00.000Z', entityType: 'folder' },
+      { priority: 2, createdAt: '2026-07-08T11:00:00.000Z', entityType: 'artwork' },
+      { priority: 1, createdAt: '2026-07-08T09:00:00.000Z', entityType: 'folder' },
     ])
 
     assert.deepEqual(jobs.map((job) => job.priority), [1, 1, 2, 3])
     assert.equal(jobs[0].createdAt, '2026-07-08T09:00:00.000Z')
+  })
+
+  it('orders delete jobs before upserts', () => {
+    const jobs = sortSyncJobs([
+      { priority: 2, createdAt: '2026-07-08T10:00:00.000Z', entityType: SYNC_ENTITY_TYPES.ARTWORK },
+      { priority: 0, createdAt: '2026-07-08T11:00:00.000Z', entityType: SYNC_ENTITY_TYPES.ARTWORK_DELETE },
+      { priority: 1, createdAt: '2026-07-08T09:00:00.000Z', entityType: SYNC_ENTITY_TYPES.FOLDER },
+      { priority: 0, createdAt: '2026-07-08T08:00:00.000Z', entityType: SYNC_ENTITY_TYPES.FOLDER_DELETE },
+    ])
+
+    assert.equal(jobs[0].entityType, SYNC_ENTITY_TYPES.FOLDER_DELETE)
+    assert.equal(jobs[1].entityType, SYNC_ENTITY_TYPES.ARTWORK_DELETE)
+    assert.equal(jobs[2].entityType, SYNC_ENTITY_TYPES.FOLDER)
+    assert.equal(jobs[3].entityType, SYNC_ENTITY_TYPES.ARTWORK)
+  })
+})
+
+describe('delete sync job types', () => {
+  it('uses separate entity types for delete tombstones', () => {
+    assert.equal(isDeleteSyncEntityType(SYNC_ENTITY_TYPES.ARTWORK_DELETE), true)
+    assert.equal(isDeleteSyncEntityType(SYNC_ENTITY_TYPES.FOLDER_DELETE), true)
+    assert.equal(isDeleteSyncEntityType(SYNC_ENTITY_TYPES.ARTWORK), false)
+    assert.equal(isDeleteSyncEntityType(SYNC_ENTITY_TYPES.FOLDER), false)
+  })
+
+  it('coalesces repeated delete jobs for the same entity', () => {
+    const now = '2026-07-08T12:00:00.000Z'
+    const existing = {
+      id: 9,
+      userId: 'user-1',
+      entityType: SYNC_ENTITY_TYPES.ARTWORK_DELETE,
+      entityId: 'art-1',
+      priority: 0,
+      status: 'failed',
+      attempts: 2,
+      lastError: 'Server error',
+      createdAt: '2026-07-08T11:00:00.000Z',
+      updatedAt: '2026-07-08T11:30:00.000Z',
+    }
+
+    const next = buildCoalescedJob(existing, {
+      userId: 'user-1',
+      entityType: SYNC_ENTITY_TYPES.ARTWORK_DELETE,
+      entityId: 'art-1',
+      now,
+    })
+
+    assert.equal(next.status, 'pending')
+    assert.equal(next.attempts, 0)
+    assert.equal(next.priority, 0)
   })
 })
 

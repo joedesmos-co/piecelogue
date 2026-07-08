@@ -3,8 +3,10 @@ import { ArtworkContext } from './artworkContext'
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
 import {
+  enqueueArtworkDeleteSync,
   enqueueArtworkMetadataSync,
   enqueueArtworkSync,
+  enqueueFolderDeleteSync,
   enqueueFolderSync,
 } from '../sync/enqueue'
 
@@ -73,6 +75,7 @@ export function ArtworkProvider({ children }) {
 
   const removeArtwork = useCallback(async (id) => {
     await artworkService.deleteArtwork(id)
+    await enqueueArtworkDeleteSync(id)
     await refresh()
   }, [refresh])
 
@@ -99,6 +102,7 @@ export function ArtworkProvider({ children }) {
 
   const removeFolder = useCallback(async (id, options) => {
     const folder = await folderService.deleteFolder(id, options)
+    await enqueueFolderDeleteSync(id)
     await refresh()
     return folder
   }, [refresh])

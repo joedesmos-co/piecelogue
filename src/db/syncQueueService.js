@@ -13,6 +13,39 @@ export async function getSyncJob(userId, entityType, entityId) {
     .first()
 }
 
+export async function clearUpsertJobsForFolder(userId, folderId) {
+  await db.syncQueue
+    .where('[userId+entityType+entityId]')
+    .equals(compoundKey(userId, SYNC_ENTITY_TYPES.FOLDER, folderId))
+    .delete()
+}
+
+export async function clearUpsertJobsForArtwork(userId, artworkId) {
+  await db.syncQueue
+    .where('[userId+entityType+entityId]')
+    .equals(compoundKey(userId, SYNC_ENTITY_TYPES.ARTWORK, artworkId))
+    .delete()
+
+  await db.syncQueue
+    .where('[userId+entityType+entityId]')
+    .equals(compoundKey(userId, SYNC_ENTITY_TYPES.ARTWORK_IMAGE, artworkId))
+    .delete()
+}
+
+export async function enqueueDeleteSyncJob(userId, entityType, entityId) {
+  if (!userId || !entityType || !entityId) {
+    return null
+  }
+
+  if (entityType === SYNC_ENTITY_TYPES.ARTWORK_DELETE) {
+    await clearUpsertJobsForArtwork(userId, entityId)
+  } else if (entityType === SYNC_ENTITY_TYPES.FOLDER_DELETE) {
+    await clearUpsertJobsForFolder(userId, entityId)
+  }
+
+  return enqueueSyncJob(userId, entityType, entityId)
+}
+
 export async function enqueueSyncJob(userId, entityType, entityId) {
   if (!userId || !entityType || !entityId) {
     return null

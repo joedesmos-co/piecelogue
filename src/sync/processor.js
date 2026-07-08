@@ -7,7 +7,7 @@ import {
   seedLibrarySyncQueue,
   updateSyncJob,
 } from '../db/syncQueueService'
-import { getImageHashes, setImageHashes } from '../db/syncImageHashService'
+import { clearImageHashes, getImageHashes, setImageHashes } from '../db/syncImageHashService'
 import {
   getSyncState,
   isLibrarySeeded,
@@ -15,6 +15,8 @@ import {
   setLastSyncedAt,
 } from '../db/syncStateService'
 import {
+  deleteCloudArtwork,
+  deleteCloudFolder,
   uploadCloudArtworkOriginal,
   uploadCloudArtworkThumbnail,
   uploadCloudArtworks,
@@ -51,6 +53,15 @@ function isOnline() {
 
 export function wakeSyncProcessor() {
   wakeProcessor?.()
+}
+
+async function processFolderDeleteJob(job) {
+  await deleteCloudFolder(job.entityId)
+}
+
+async function processArtworkDeleteJob(job) {
+  await deleteCloudArtwork(job.entityId)
+  await clearImageHashes(job.userId, job.entityId)
 }
 
 async function processFolderJob(job) {
@@ -110,6 +121,12 @@ async function processArtworkImageJob(job) {
 
 async function processJob(job) {
   switch (job.entityType) {
+    case SYNC_ENTITY_TYPES.FOLDER_DELETE:
+      await processFolderDeleteJob(job)
+      break
+    case SYNC_ENTITY_TYPES.ARTWORK_DELETE:
+      await processArtworkDeleteJob(job)
+      break
     case SYNC_ENTITY_TYPES.FOLDER:
       await processFolderJob(job)
       break
@@ -151,6 +168,11 @@ async function processReadyJobs(userId) {
     ),
   )
 
+  const deleteJobs = readyJobs.filter(
+    (job) =>
+      job.entityType === SYNC_ENTITY_TYPES.FOLDER_DELETE ||
+      job.entityType === SYNC_ENTITY_TYPES.ARTWORK_DELETE,
+  )
   const folderJobs = readyJobs.filter((job) => job.entityType === SYNC_ENTITY_TYPES.FOLDER)
   const artworkJobs = readyJobs.filter((job) => job.entityType === SYNC_ENTITY_TYPES.ARTWORK)
   const imageJobs = readyJobs.filter((job) => job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE)
@@ -173,6 +195,11 @@ async function processReadyJobs(userId) {
     }
   }
 
+  for (const job of deleteJobs) {
+    if (processorAbort) return
+    await handleJob(job).catch(() => {})
+  }
+
   for (const job of folderJobs) {
     if (processorAbort) return
     await handleJob(job).catch(() => {})
@@ -188,9 +215,18 @@ async function processReadyJobs(userId) {
     await handleJob(job).catch(() => {})
   })
 
-  if (folderJobs.length + artworkJobs.length + imageJobs.length > 0) {
+  if (deleteJobs.length + folderJobs.length + artworkJobs.length + imageJobs.length > 0) {
     await setLastSyncedAt(userId)
   }
+}
+
+function countPendingDeleteJobs(jobs) {
+  return jobs.filter(
+    (job) =>
+      (job.status === SYNC_JOB_STATUS.PENDING || job.status === SYNC_JOB_STATUS.FAILED) &&
+      (job.entityType === SYNC_ENTITY_TYPES.FOLDER_DELETE ||
+        job.entityType === SYNC_ENTITY_TYPES.ARTWORK_DELETE),
+  ).length
 }
 
 async function buildStatus(userId) {
@@ -198,6 +234,7 @@ async function buildStatus(userId) {
     return {
       state: 'signed-out',
       pendingCount: 0,
+      pendingDeleteCount: 0,
       lastSyncedAt: null,
       error: null,
     }
@@ -210,10 +247,13 @@ async function buildStatus(userId) {
   const waitingRetryCount = pendingJobs.length - readyCount
   const state = await getSyncState(userId)
 
+  const pendingDeleteCount = countPendingDeleteJobs(jobs)
+
   if (!isOnline()) {
     return {
       state: 'offline',
       pendingCount: pendingJobs.length + failedJobs.length,
+      pendingDeleteCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? null,
     }
@@ -223,6 +263,7 @@ async function buildStatus(userId) {
     return {
       state: 'error',
       pendingCount: pendingJobs.length + failedJobs.length,
+      pendingDeleteCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? 'Sync failed.',
     }
@@ -232,6 +273,7 @@ async function buildStatus(userId) {
     return {
       state: 'syncing',
       pendingCount: pendingJobs.length,
+      pendingDeleteCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
     }
@@ -241,6 +283,7 @@ async function buildStatus(userId) {
     return {
       state: waitingRetryCount > 0 && readyCount === 0 ? 'waiting' : 'pending',
       pendingCount: pendingJobs.length,
+      pendingDeleteCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
     }
@@ -249,6 +292,7 @@ async function buildStatus(userId) {
   return {
     state: 'up-to-date',
     pendingCount: 0,
+    pendingDeleteCount: 0,
     lastSyncedAt: state?.lastSyncedAt ?? null,
     error: null,
   }

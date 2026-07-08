@@ -7,6 +7,8 @@ import {
   getCloudStatus,
   saveArtworkOriginal,
   saveArtworkThumbnail,
+  softDeleteCloudArtwork,
+  softDeleteCloudFolder,
   upsertCloudArtworks,
   upsertCloudFolders,
 } from '../cloud/storage.js'
@@ -65,6 +67,65 @@ function parseArtworkImagePath(pathname, suffix) {
   const pattern = new RegExp(`^/api/cloud/artworks/([^/]+)/${suffix}$`)
   const match = pathname.match(pattern)
   return match?.[1] ?? null
+}
+
+function parseCloudResourcePath(pathname, resource) {
+  const pattern = new RegExp(`^/api/cloud/${resource}/([^/]+)$`)
+  const match = pathname.match(pattern)
+  return match?.[1] ?? null
+}
+
+async function handleDeleteFolder(request, env, folderId) {
+  const auth = await requireAuthenticatedUser(request, env)
+  if (auth.error) {
+    return withCloudHeaders(auth.error)
+  }
+
+  const result = await softDeleteCloudFolder(env.DB, auth.user.id, folderId)
+  if (!result) {
+    return withCloudHeaders(jsonError(404, 'not_found', 'Folder not found.'))
+  }
+
+  return withCloudHeaders(
+    jsonOk({
+      ok: true,
+      folderId,
+      deletedAt: result.deletedAt,
+      alreadyDeleted: Boolean(result.alreadyDeleted),
+    }),
+  )
+}
+
+async function handleDeleteArtwork(request, env, artworkId) {
+  const auth = await requireAuthenticatedUser(request, env)
+  if (auth.error) {
+    return withCloudHeaders(auth.error)
+  }
+
+  if (!env.ARTWORK_BUCKET) {
+    return withCloudHeaders(jsonError(503, 'service_unavailable', 'Cloud storage is not available.'))
+  }
+
+  const result = await softDeleteCloudArtwork(
+    env.DB,
+    env.ARTWORK_BUCKET,
+    auth.user.id,
+    artworkId,
+  )
+
+  if (!result) {
+    return withCloudHeaders(jsonError(404, 'not_found', 'Artwork not found.'))
+  }
+
+  return withCloudHeaders(
+    jsonOk({
+      ok: true,
+      artworkId,
+      deletedAt: result.deletedAt,
+      alreadyDeleted: Boolean(result.alreadyDeleted),
+      r2Deleted: result.r2Deleted ?? 0,
+    }),
+  )
 }
 
 async function handlePutFolders(request, env) {
@@ -172,7 +233,6 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
       jsonOk({
         ok: true,
         artworkId,
-        objectKey: result.objectKey,
         updatedAt: result.updatedAt,
       }),
     )
@@ -265,6 +325,16 @@ export async function handleCloudRoute(request, env, path) {
 
   if (path === '/api/cloud/library' && request.method === 'GET') {
     return handleGetLibrary(request, env)
+  }
+
+  const folderId = parseCloudResourcePath(path, 'folders')
+  if (folderId && request.method === 'DELETE') {
+    return handleDeleteFolder(request, env, folderId)
+  }
+
+  const artworkId = parseCloudResourcePath(path, 'artworks')
+  if (artworkId && request.method === 'DELETE') {
+    return handleDeleteArtwork(request, env, artworkId)
   }
 
   const originalArtworkId = parseArtworkImagePath(path, 'original')

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { LogOut, User } from 'lucide-react'
 import { fetchProfile, updateUsername } from '../api/profile'
 import { useAuth } from '../hooks/useAuth'
+import { formatUserError } from '../utils/userErrors'
 import SignInDialog from './SignInDialog'
 import UsernameDialog from './UsernameDialog'
 
@@ -45,7 +46,7 @@ export default function AccountSection() {
         }
       } catch (err) {
         if (!cancelled) {
-          setProfileError(err.message || 'Failed to load profile.')
+          setProfileError(formatUserError(err, 'Failed to load profile.'))
         }
       } finally {
         if (!cancelled) {
@@ -68,7 +69,7 @@ export default function AccountSection() {
       await signOut()
       setProfile(null)
     } catch (err) {
-      setSignOutError(err.message || 'Unable to sign out. Please try again.')
+      setSignOutError(formatUserError(err, 'Unable to sign out. Please try again.'))
     } finally {
       setSigningOut(false)
     }
@@ -160,7 +161,7 @@ export default function AccountSection() {
           {!loading && !error && !authenticated ? (
             <div className="account-signed-out">
               <p className="settings-text settings-text--muted">
-                Sign in to reserve a username for future sharing. Cloud sync is not available yet.
+                Sign in to sync your library and reserve a username for future sharing.
               </p>
               <div className="account-sign-in-options">
                 <button

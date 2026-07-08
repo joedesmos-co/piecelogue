@@ -28,6 +28,11 @@ export async function setImageHashes(userId, artworkId, { originalHash, thumbnai
   })
 }
 
+export async function clearImageHashes(userId, artworkId) {
+  const id = buildImageHashRecordId(userId, artworkId)
+  await db.syncImageHashes.delete(id)
+}
+
 export async function clearImageHashesForUser(userId) {
   await db.syncImageHashes.where('userId').equals(userId).delete()
 }

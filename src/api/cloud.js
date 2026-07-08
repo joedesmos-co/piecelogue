@@ -59,6 +59,18 @@ export async function downloadCloudArtworkImage(artworkId, imageType) {
   return response.blob()
 }
 
+export async function deleteCloudFolder(folderId) {
+  return apiFetch(`/api/cloud/folders/${encodeURIComponent(folderId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function deleteCloudArtwork(artworkId) {
+  return apiFetch(`/api/cloud/artworks/${encodeURIComponent(artworkId)}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function uploadCloudFolders(folders) {
   return apiFetch('/api/cloud/folders', {
     method: 'PUT',

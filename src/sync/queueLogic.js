@@ -1,4 +1,11 @@
-import { SYNC_PRIORITIES } from './constants.js'
+import { SYNC_PRIORITIES, SYNC_ENTITY_TYPES } from './constants.js'
+
+export function isDeleteSyncEntityType(entityType) {
+  return (
+    entityType === SYNC_ENTITY_TYPES.FOLDER_DELETE ||
+    entityType === SYNC_ENTITY_TYPES.ARTWORK_DELETE
+  )
+}
 
 export function buildSyncJobKey(userId, entityType, entityId) {
   return `${userId}:${entityType}:${entityId}`

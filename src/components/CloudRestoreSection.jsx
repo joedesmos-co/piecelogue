@@ -9,55 +9,69 @@ export default function CloudRestoreSection({ authenticated }) {
   }
 
   const { phase, progress, result, error } = restoreState
-  const showSection = promptVisible || phase === 'restoring' || phase === 'done' || phase === 'error'
-
-  if (!showSection) {
-    return null
-  }
+  const isRestoring = phase === 'restoring'
+  const isChecking = phase === 'checking'
+  const showActiveState =
+    promptVisible || isChecking || isRestoring || phase === 'done' || phase === 'error'
 
   const progressPercent =
     progress?.total > 0 ? Math.round((progress.current / progress.total) * 100) : null
 
   return (
-    <section className="settings-section">
-      <h3 className="settings-section-title">
+    <section className="settings-section" aria-labelledby="cloud-restore-heading">
+      <h3 id="cloud-restore-heading" className="settings-section-title">
         <CloudDownload size={18} />
         Restore from Cloud
       </h3>
 
       <div className="settings-card">
+        <p className="settings-text settings-text--muted">
+          Download your cloud library to this device. If this device already has artwork, you will
+          be asked before anything is replaced.
+        </p>
+
+        {isChecking ? (
+          <p className="settings-text settings-text--muted" role="status" aria-live="polite">
+            <LoaderCircle size={14} className="cloud-save-spinner" aria-hidden="true" /> Checking
+            cloud library...
+          </p>
+        ) : null}
+
         {promptVisible ? (
           <div className="cloud-save-warning" role="note">
             <p className="settings-text">
-              Cloud library found. Restore from cloud? This may add/replace local items.
+              Cloud library found. Restore from cloud? This may add or replace local items on this
+              device.
             </p>
             <div className="account-actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={restoreNow}
-              >
+              <button type="button" className="btn btn--primary btn--sm" onClick={restoreNow}>
                 Restore from cloud
               </button>
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm"
-                onClick={keepDevice}
-              >
+              <button type="button" className="btn btn--secondary btn--sm" onClick={keepDevice}>
                 Keep this device
               </button>
             </div>
           </div>
+        ) : !showActiveState ? (
+          <button type="button" className="btn btn--secondary btn--sm" onClick={restoreNow}>
+            Restore from cloud
+          </button>
         ) : null}
 
-        {phase === 'restoring' && progress ? (
-          <div className="cloud-save-progress" aria-live="polite">
+        {isRestoring && progress ? (
+          <div className="cloud-save-progress" aria-live="polite" role="status">
             <div className="cloud-save-progress-header">
               <LoaderCircle size={16} className="cloud-save-spinner" aria-hidden="true" />
               <span>{progress.message}</span>
             </div>
             {progressPercent !== null ? (
-              <div className="cloud-save-progress-bar" aria-hidden="true">
+              <div
+                className="cloud-save-progress-bar"
+                role="progressbar"
+                aria-valuenow={progressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
                 <div
                   className="cloud-save-progress-fill"
                   style={{ width: `${progressPercent}%` }}

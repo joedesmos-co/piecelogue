@@ -14,7 +14,9 @@ import CloudSaveSection from '../components/CloudSaveSection'
 import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
+import LoadingState from '../components/LoadingState'
 import { formatTime } from '../utils/formatTime'
+import { formatUserError } from '../utils/userErrors'
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
@@ -43,7 +45,7 @@ export default function ProfilePage() {
         const data = await getStats()
         setStats(data)
       } catch (err) {
-        setError(err.message || 'Failed to load statistics.')
+        setError(formatUserError(err, 'Failed to load statistics.'))
       } finally {
         setLoading(false)
       }
@@ -76,13 +78,18 @@ export default function ProfilePage() {
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="settings-card">
-            <p className="settings-text settings-text--muted">Calculating stats...</p>
+        {loading ? <LoadingState message="Calculating stats..." /> : null}
+
+        {!loading && stats && stats.totalArtworks === 0 ? (
+          <div className="settings-card settings-card--placeholder">
+            <p className="settings-text settings-text--muted">
+              No artwork logged yet. Add your first piece from the Gallery to start tracking your
+              creative journey.
+            </p>
           </div>
         ) : null}
 
-        {!loading && stats ? (
+        {!loading && stats && stats.totalArtworks > 0 ? (
           <div className="stats-grid">
             <StatCard
               icon={Folder}

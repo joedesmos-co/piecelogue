@@ -6,6 +6,7 @@ import { decideRestoreAction } from '../sync/restoreLogic'
 import { restoreLibraryFromCloud } from '../utils/cloudRestore'
 import { useAuth } from '../hooks/useAuth'
 import { useArtworks } from '../hooks/useArtworks'
+import { formatUserError } from '../utils/userErrors'
 import { RestoreContext } from './restoreContext'
 
 const INITIAL_STATE = {
@@ -51,7 +52,7 @@ export function RestoreProvider({ children }) {
         phase: 'error',
         progress: null,
         result: null,
-        error: error?.message || 'Failed to restore from cloud.',
+        error: formatUserError(error, 'Failed to restore from cloud. Your local library is unchanged.'),
       })
     } finally {
       restoringRef.current = false

@@ -17,6 +17,7 @@ import FolderCard from '../components/FolderCard'
 import FolderNameDialog from '../components/FolderNameDialog'
 import GalleryBreadcrumbs from '../components/GalleryBreadcrumbs'
 import GalleryContextMenu from '../components/GalleryContextMenu'
+import LoadingState from '../components/LoadingState'
 
 export default function GalleryPage({ onAdd, onEdit }) {
   const {
@@ -296,7 +297,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
       )}
 
       {loading ? (
-        <div className="loading-state">Loading your gallery...</div>
+        <LoadingState message="Loading your gallery..." />
       ) : (
         <>
           {showFolderSection && (

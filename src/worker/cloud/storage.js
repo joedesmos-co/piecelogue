@@ -1,6 +1,8 @@
 import { IMAGE_EXTENSION_BY_TYPE } from './constants.js'
 import { nowIso } from '../auth/tokens.js'
 
+export const CLOUD_LIBRARY_ACTIVE_FILTER = 'deleted_at IS NULL'
+
 export function getOriginalObjectKey(userId, artworkId, contentType) {
   const extension = IMAGE_EXTENSION_BY_TYPE[contentType] || 'bin'
   return `users/${userId}/artworks/${artworkId}/original.${extension}`
@@ -200,9 +202,94 @@ export async function upsertCloudArtworks(db, userId, artworks) {
   return { saved }
 }
 
+export function getArtworkObjectKeys(row) {
+  if (!row) {
+    return []
+  }
+
+  return [row.original_object_key, row.thumbnail_object_key].filter(Boolean)
+}
+
+export async function softDeleteCloudFolder(db, userId, folderId) {
+  const row = await db
+    .prepare('SELECT id, user_id, deleted_at FROM folders WHERE id = ?')
+    .bind(folderId)
+    .first()
+
+  if (!row || row.user_id !== userId) {
+    return null
+  }
+
+  if (row.deleted_at) {
+    return { alreadyDeleted: true, deletedAt: row.deleted_at }
+  }
+
+  const deletedAt = nowIso()
+  await db
+    .prepare(
+      `UPDATE folders
+       SET deleted_at = ?, updated_at = ?
+       WHERE id = ? AND user_id = ?`,
+    )
+    .bind(deletedAt, deletedAt, folderId, userId)
+    .run()
+
+  return { deletedAt }
+}
+
+export async function softDeleteCloudArtwork(db, bucket, userId, artworkId) {
+  const row = await db
+    .prepare(
+      `SELECT id, user_id, deleted_at, original_object_key, thumbnail_object_key
+       FROM artworks
+       WHERE id = ?`,
+    )
+    .bind(artworkId)
+    .first()
+
+  if (!row || row.user_id !== userId) {
+    return null
+  }
+
+  if (row.deleted_at) {
+    return { alreadyDeleted: true, deletedAt: row.deleted_at, r2Deleted: 0 }
+  }
+
+  const objectKeys = getArtworkObjectKeys(row)
+  const deletedAt = nowIso()
+
+  await db
+    .prepare(
+      `UPDATE artworks
+       SET deleted_at = ?,
+           updated_at = ?,
+           original_object_key = NULL,
+           thumbnail_object_key = NULL
+       WHERE id = ? AND user_id = ?`,
+    )
+    .bind(deletedAt, deletedAt, artworkId, userId)
+    .run()
+
+  let r2Deleted = 0
+  if (bucket && objectKeys.length > 0) {
+    for (const objectKey of objectKeys) {
+      try {
+        await bucket.delete(objectKey)
+        r2Deleted += 1
+      } catch {
+        // R2 cleanup is best-effort after D1 tombstone is set.
+      }
+    }
+  }
+
+  return { deletedAt, r2Deleted }
+}
+
 export async function assertArtworkOwnedByUser(db, userId, artworkId) {
   const row = await db
-    .prepare('SELECT id, user_id FROM artworks WHERE id = ?')
+    .prepare(
+      'SELECT id, user_id FROM artworks WHERE id = ? AND deleted_at IS NULL',
+    )
     .bind(artworkId)
     .first()
 
@@ -316,7 +403,9 @@ export async function getCloudLibrary(db, userId) {
 export async function getArtworkImageObject(db, bucket, userId, artworkId, imageType) {
   const row = await db
     .prepare(
-      'SELECT user_id, original_object_key, thumbnail_object_key FROM artworks WHERE id = ?',
+      `SELECT user_id, original_object_key, thumbnail_object_key
+       FROM artworks
+       WHERE id = ? AND deleted_at IS NULL`,
     )
     .bind(artworkId)
     .first()

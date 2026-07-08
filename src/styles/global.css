@@ -153,7 +153,7 @@ img {
   flex-direction: column;
   min-width: 0;
   min-height: 100dvh;
-  padding-bottom: var(--bottom-nav-height);
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
 }
 
 .app-content {
@@ -257,6 +257,7 @@ img {
   align-items: center;
   justify-content: center;
   gap: 2px;
+  min-height: 44px;
   border: none;
   background: none;
   color: var(--text-muted);
@@ -462,8 +463,34 @@ img {
 }
 
 .btn--sm {
-  padding: 6px 10px;
+  padding: 8px 12px;
   font-size: 13px;
+  min-height: 36px;
+}
+
+@media (max-width: 480px) {
+  .account-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .account-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .gallery-toolbar {
+    width: 100%;
+  }
+
+  .gallery-toolbar .btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+
+  .page-header {
+    gap: 12px;
+  }
 }
 
 /* Public-site CTA buttons — landing + informational pages only */
@@ -552,9 +579,24 @@ a.btn--public:hover,
 }
 
 .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   text-align: center;
   padding: 48px 16px;
   color: var(--text-muted);
+}
+
+.loading-state p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.loading-state-spinner,
+.cloud-save-spinner {
+  animation: spin 0.9s linear infinite;
 }
 
 .alert {
@@ -1562,10 +1604,6 @@ a.btn--public:hover,
   gap: 8px;
   font-size: 14px;
   color: var(--text-heading);
-}
-
-.cloud-save-spinner {
-  animation: spin 1s linear infinite;
 }
 
 .cloud-save-progress-bar {

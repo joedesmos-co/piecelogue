@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  getArtworkObjectKeys,
   getOriginalObjectKey,
   getThumbnailObjectKey,
   mapCloudArtworkRow,
@@ -68,5 +69,31 @@ describe('cloud library row mapping', () => {
     assert.equal(artwork.favorite, true)
     assert.equal(artwork.folderId, 'folder-1')
     assert.equal('original_object_key' in artwork, false)
+  })
+})
+
+describe('cloud delete helpers', () => {
+  it('collects artwork R2 object keys for cleanup', () => {
+    assert.deepEqual(
+      getArtworkObjectKeys({
+        original_object_key: 'users/u/artworks/a1/original.png',
+        thumbnail_object_key: 'users/u/artworks/a1/thumbnail.jpg',
+      }),
+      ['users/u/artworks/a1/original.png', 'users/u/artworks/a1/thumbnail.jpg'],
+    )
+    assert.deepEqual(getArtworkObjectKeys({ original_object_key: null, thumbnail_object_key: null }), [])
+  })
+
+  it('maps only active cloud library rows without deleted_at', () => {
+    const activeFolder = mapCloudFolderRow({
+      id: 'folder-1',
+      name: 'Sketches',
+      parent_folder_id: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-02T00:00:00.000Z',
+    })
+
+    assert.equal(activeFolder.id, 'folder-1')
+    assert.equal('deleted_at' in activeFolder, false)
   })
 })

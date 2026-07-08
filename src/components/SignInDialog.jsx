@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Modal from './Modal'
 import { useAuth } from '../hooks/useAuth'
+import { formatUserError } from '../utils/userErrors'
 
 function SignInForm({ onClose }) {
   const { requestLink } = useAuth()
@@ -20,7 +21,7 @@ function SignInForm({ onClose }) {
       setSent(true)
       setDevMagicLink(result?.dev?.magicLink ?? null)
     } catch (err) {
-      setError(err.message || 'Unable to send a sign-in link. Please try again.')
+      setError(formatUserError(err, 'Unable to send a sign-in link. Please try again.'))
     } finally {
       setSubmitting(false)
     }

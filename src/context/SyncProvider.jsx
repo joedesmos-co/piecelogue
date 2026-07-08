@@ -16,6 +16,7 @@ import { SyncContext } from './syncContext'
 const INITIAL_STATUS = {
   state: 'signed-out',
   pendingCount: 0,
+  pendingDeleteCount: 0,
   lastSyncedAt: null,
   error: null,
 }
