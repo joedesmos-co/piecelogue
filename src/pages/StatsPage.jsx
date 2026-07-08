@@ -53,7 +53,7 @@ export default function StatsPage() {
 
       {loading ? (
         <div className="loading-state">Calculating stats...</div>
-      ) : (
+      ) : stats ? (
         <div className="stats-grid">
           <StatCard
             icon={BarChart3}
@@ -98,7 +98,7 @@ export default function StatsPage() {
             accent="other"
           />
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

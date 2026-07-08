@@ -1,16 +1,46 @@
-# React + Vite
+# Piecelogue
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A local-first web app for artists to log artwork, organize pieces into folders, and track creative progress. All data is stored in your browser using IndexedDB.
 
-Currently, two official plugins are available:
+**Live site:** [piecelogue.com](https://piecelogue.com)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Gallery with artwork cards and full-screen image lightbox
+- Folders for organizing artwork
+- Add, edit, and delete artwork with images, medium details, time tracking, and notes
+- Statistics page for lifetime creative metrics
+- Settings with local storage information
+- Public pages: About, Privacy, Terms, Contact
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the ESLint configuration
+- React 19 + Vite 8
+- Dexie (IndexedDB)
+- Plain CSS, mobile-first layout
+- Deployed to Cloudflare Workers Static Assets
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+## Build and deploy
+
+```bash
+npm run lint
+npm run build
+npx wrangler deploy
+```
+
+Static files (`sitemap.xml`, `robots.txt`, `ads.txt`) are copied from `public/` into `dist/` during build.
+
+## Data storage
+
+The current version stores all artwork images and metadata locally in your browser. There is no cloud sync or user accounts yet. Clearing browser data may remove your library.
+
+## License
+
+Private project.

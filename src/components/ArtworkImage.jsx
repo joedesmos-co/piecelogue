@@ -23,13 +23,13 @@ export default function ArtworkImage({
     return source.map(coalesceBlob).filter(Boolean)
   }, [blob, blobs])
 
-  const [candidateKey, setCandidateKey] = useState(() => blobsKey(candidates))
+  const currentKey = blobsKey(candidates)
+  const [trackedKey, setTrackedKey] = useState(currentKey)
   const [activeIndex, setActiveIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
 
-  const currentKey = blobsKey(candidates)
-  if (currentKey !== candidateKey) {
-    setCandidateKey(currentKey)
+  if (currentKey !== trackedKey) {
+    setTrackedKey(currentKey)
     setActiveIndex(0)
     setExhausted(false)
   }

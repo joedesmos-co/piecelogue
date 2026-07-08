@@ -27,7 +27,7 @@ export default function TermsPage() {
 
       <h2>Your artwork and content</h2>
       <p>
-        You retain ownership of the artwork, images, and content you add to
+        You retain ownership of the artwork, images, and content you add to{' '}
         {APP_NAME}. You are responsible for ensuring you have the rights to
         upload and store the material you add.
       </p>

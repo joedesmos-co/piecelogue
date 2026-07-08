@@ -10,18 +10,23 @@ export default function ArtworkCard({ artwork, folders = [], onClick }) {
   const folderName = getFolderName(artwork.folderId, folders)
 
   return (
-    <article className="artwork-card" onClick={() => onClick(artwork)}>
+    <button
+      type="button"
+      className="artwork-card"
+      onClick={() => onClick(artwork)}
+      aria-label={`View ${artwork.title}`}
+    >
       <div className="artwork-card-image-wrap">
         <ArtworkImage
           blobs={imageBlobs}
-          alt={artwork.title}
+          alt=""
           className="artwork-card-image"
           fallbackClassName="artwork-card-placeholder"
           loading="lazy"
           iconSize={28}
         />
         {artwork.favorite && (
-          <span className="artwork-card-favorite" aria-label="Favorite">
+          <span className="artwork-card-favorite" aria-hidden="true">
             <Heart size={14} fill="currentColor" />
           </span>
         )}
@@ -44,18 +49,18 @@ export default function ArtworkCard({ artwork, folders = [], onClick }) {
           )}
           {folderName && (
             <span className="artwork-card-detail artwork-card-folder">
-              <Folder size={12} />
+              <Folder size={12} aria-hidden="true" />
               {folderName}
             </span>
           )}
           {(artwork.totalMinutes > 0) && (
             <span className="artwork-card-time">
-              <Clock size={12} />
+              <Clock size={12} aria-hidden="true" />
               {formatTime(artwork.totalMinutes)}
             </span>
           )}
         </div>
       </div>
-    </article>
+    </button>
   )
 }

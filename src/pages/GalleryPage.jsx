@@ -176,6 +176,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
           title="Delete Artwork"
           message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
           confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+          busy={deleting}
         />
       </>
     )
@@ -376,6 +377,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
         title="Delete Folder"
         message={`Delete "${deleteFolderTarget?.name}"? The ${deleteFolderTarget?.count || 0} artwork${deleteFolderTarget?.count === 1 ? '' : 's'} inside will be moved to Unfiled. The artwork will not be deleted.`}
         confirmLabel={deletingFolder ? 'Deleting...' : 'Delete Folder'}
+        busy={deletingFolder}
       />
 
       <GalleryContextMenu

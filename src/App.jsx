@@ -83,7 +83,7 @@ function AppContent() {
 
       <Modal
         isOpen={showForm}
-        onClose={handleCloseForm}
+        onClose={saving ? () => {} : handleCloseForm}
         title={editingArtwork ? 'Edit Artwork' : 'Add Artwork'}
         className="modal--form"
       >
