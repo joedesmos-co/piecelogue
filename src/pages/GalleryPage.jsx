@@ -237,9 +237,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
   const showFolderSection = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.FOLDER
   const showUnfiledHeading = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.UNFILED
-  const topLevelFolderCount = folders.filter(
-    (folder) => normalizeParentFolderId(folder.parentFolderId) === null,
-  ).length
+  const hasAnyArtwork = artworks.length > 0
 
   return (
     <div
@@ -362,18 +360,30 @@ export default function GalleryPage({ onAdd, onEdit }) {
                       className="btn btn--primary"
                       onClick={() => onAdd(currentFolderId)}
                     >
-                      Add Artwork to Folder
+                      Add artwork to folder
                     </button>
                   </div>
                 ) : null
-              ) : view === GALLERY_VIEWS.HOME && topLevelFolderCount === 0 ? (
+              ) : view === GALLERY_VIEWS.HOME && !hasAnyArtwork ? (
                 <EmptyState onAdd={() => onAdd(null)} />
               ) : (
                 <div className="empty-state">
-                  <h2 className="empty-state-title">No unfiled artwork</h2>
+                  <div className="empty-state-icon" aria-hidden="true">
+                    <ImageIcon size={40} strokeWidth={1.5} />
+                  </div>
+                  <h2 className="empty-state-title">
+                    {view === GALLERY_VIEWS.UNFILED ? 'No unfiled artwork' : 'No unfiled artwork here'}
+                  </h2>
                   <p className="empty-state-text">
-                    Artwork not in a folder will appear here.
+                    {view === GALLERY_VIEWS.UNFILED
+                      ? 'Pieces without a folder appear here. Add artwork from the Gallery or move items out of folders.'
+                      : 'Artwork stored in folders does not appear here. Open a folder to view it, or add new unfiled work.'}
                   </p>
+                  {view === GALLERY_VIEWS.UNFILED ? (
+                    <button type="button" className="btn btn--primary" onClick={() => onAdd(null)}>
+                      Add unfiled artwork
+                    </button>
+                  ) : null}
                 </div>
               )
             ) : (

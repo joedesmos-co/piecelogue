@@ -6,11 +6,15 @@ import {
   Folder,
   Monitor,
   Paintbrush,
+  Palette,
   Shapes,
 } from 'lucide-react'
 import AccountSection from '../components/AccountSection'
 import CloudRestoreSection from '../components/CloudRestoreSection'
+import CloudConflictSection from '../components/CloudConflictSection'
 import CloudSaveSection from '../components/CloudSaveSection'
+import AccountDataControlsSection from '../components/AccountDataControlsSection'
+import LocalFirstExplainer from '../components/LocalFirstExplainer'
 import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
@@ -62,9 +66,20 @@ export default function ProfilePage() {
 
       <AccountSection />
 
+      <section className="settings-section">
+        <h3 className="settings-section-title">How Piecelogue works</h3>
+        <div className="settings-card">
+          <LocalFirstExplainer compact />
+        </div>
+      </section>
+
       <CloudRestoreSection authenticated={authenticated} />
 
+      <CloudConflictSection authenticated={authenticated} />
+
       <CloudSaveSection authenticated={authenticated} />
+
+      <AccountDataControlsSection authenticated={authenticated} />
 
       <section className="settings-section">
         <h3 className="settings-section-title">
@@ -81,10 +96,14 @@ export default function ProfilePage() {
         {loading ? <LoadingState message="Calculating stats..." /> : null}
 
         {!loading && stats && stats.totalArtworks === 0 ? (
-          <div className="settings-card settings-card--placeholder">
+          <div className="settings-card settings-card--placeholder profile-stats-empty">
+            <div className="empty-state-icon" aria-hidden="true">
+              <Palette size={36} strokeWidth={1.5} />
+            </div>
+            <h4 className="profile-stats-empty-title">No stats yet</h4>
             <p className="settings-text settings-text--muted">
-              No artwork logged yet. Add your first piece from the Gallery to start tracking your
-              creative journey.
+              Add artwork from the Gallery to track finished pieces, time spent, and medium breakdowns
+              here.
             </p>
           </div>
         ) : null}

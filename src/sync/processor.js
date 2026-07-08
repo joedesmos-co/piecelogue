@@ -1,5 +1,6 @@
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
+import { db } from '../db/database'
 import {
   getSyncJobsForUser,
   removeSyncJob,
@@ -14,6 +15,9 @@ import {
   markLibrarySeeded,
   setLastSyncedAt,
 } from '../db/syncStateService'
+import { getSyncConflictsForUser } from '../db/syncConflictService'
+import { saveSyncConflict } from '../db/syncConflictService'
+import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevisionService'
 import {
   deleteCloudArtwork,
   deleteCloudFolder,
@@ -24,6 +28,8 @@ import {
 } from '../api/cloud'
 import { assertActiveUserScope, getActiveSyncUserId } from './activeUser'
 import { toCloudArtworkMetadata, toCloudFolder } from './cloudPayload'
+import { snapshotArtwork, snapshotFolder } from './conflictLogic'
+import { extractUpsertRevision } from './conflictResolutionCore.js'
 import {
   MAX_IMAGE_UPLOAD_CONCURRENCY,
   SYNC_ENTITY_TYPES,
@@ -64,24 +70,71 @@ async function processArtworkDeleteJob(job) {
   await clearImageHashes(job.userId, job.entityId)
 }
 
-async function processFolderJob(job) {
-  const folder = await folderService.getFolderById(job.entityId)
-  if (!folder) {
-    await removeSyncJob(job.id)
+async function markMetadataConflict(job, entityType, localRecord, conflictEntry) {
+  await saveSyncConflict({
+    userId: job.userId,
+    entityType,
+    entityId: job.entityId,
+    jobId: job.id,
+    baseRevision: conflictEntry.baseRevision,
+    cloudRevision: conflictEntry.cloudRevision,
+    local: localRecord,
+    cloud: conflictEntry.cloud,
+  })
+  await updateSyncJob(job.id, {
+    status: SYNC_JOB_STATUS.CONFLICT,
+    lastError: 'Sync conflict — review needed.',
+  })
+  await publishStatus(job.userId)
+}
+
+async function applyMetadataRevision(entityType, entityId, response) {
+  const revision = extractUpsertRevision(response, entityId)
+  if (!revision) {
     return
   }
 
-  await uploadCloudFolders([toCloudFolder(folder)])
+  if (entityType === SYNC_ENTITY_TYPES.FOLDER) {
+    await setFolderCloudRevision(entityId, revision)
+  } else {
+    await setArtworkCloudRevision(entityId, revision)
+  }
+}
+
+async function processFolderJob(job) {
+  const folder = await db.folders.get(job.entityId)
+  if (!folder) {
+    await removeSyncJob(job.id)
+    return false
+  }
+
+  const response = await uploadCloudFolders([toCloudFolder(folder)])
+  const conflictEntry = response.conflicts?.find((entry) => entry.id === job.entityId)
+  if (conflictEntry) {
+    await markMetadataConflict(job, SYNC_ENTITY_TYPES.FOLDER, snapshotFolder(folder), conflictEntry)
+    return true
+  }
+
+  await applyMetadataRevision(SYNC_ENTITY_TYPES.FOLDER, job.entityId, response)
+  return false
 }
 
 async function processArtworkJob(job) {
-  const artwork = await artworkService.getArtworkById(job.entityId)
+  const artwork = await db.artworks.get(job.entityId)
   if (!artwork) {
     await removeSyncJob(job.id)
-    return
+    return false
   }
 
-  await uploadCloudArtworks([toCloudArtworkMetadata(artwork)])
+  const response = await uploadCloudArtworks([toCloudArtworkMetadata(artwork)])
+  const conflictEntry = response.conflicts?.find((entry) => entry.id === job.entityId)
+  if (conflictEntry) {
+    await markMetadataConflict(job, SYNC_ENTITY_TYPES.ARTWORK, snapshotArtwork(artwork), conflictEntry)
+    return true
+  }
+
+  await applyMetadataRevision(SYNC_ENTITY_TYPES.ARTWORK, job.entityId, response)
+  return false
 }
 
 async function processArtworkImageJob(job) {
@@ -123,19 +176,17 @@ async function processJob(job) {
   switch (job.entityType) {
     case SYNC_ENTITY_TYPES.FOLDER_DELETE:
       await processFolderDeleteJob(job)
-      break
+      return false
     case SYNC_ENTITY_TYPES.ARTWORK_DELETE:
       await processArtworkDeleteJob(job)
-      break
+      return false
     case SYNC_ENTITY_TYPES.FOLDER:
-      await processFolderJob(job)
-      break
+      return processFolderJob(job)
     case SYNC_ENTITY_TYPES.ARTWORK:
-      await processArtworkJob(job)
-      break
+      return processArtworkJob(job)
     case SYNC_ENTITY_TYPES.ARTWORK_IMAGE:
       await processArtworkImageJob(job)
-      break
+      return false
     default:
       throw new Error(`Unknown sync entity type: ${job.entityType}`)
   }
@@ -183,7 +234,10 @@ async function processReadyJobs(userId) {
     }
 
     try {
-      await processJob(job)
+      const conflicted = await processJob(job)
+      if (conflicted) {
+        return
+      }
       await removeSyncJob(job.id)
     } catch (error) {
       const updates = buildRetryUpdate(job, error)
@@ -235,14 +289,18 @@ async function buildStatus(userId) {
       state: 'signed-out',
       pendingCount: 0,
       pendingDeleteCount: 0,
+      conflictCount: 0,
       lastSyncedAt: null,
       error: null,
     }
   }
 
   const jobs = await getSyncJobsForUser(userId)
+  const conflicts = await getSyncConflictsForUser(userId)
   const pendingJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.PENDING)
   const failedJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.FAILED)
+  const conflictJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.CONFLICT)
+  const conflictCount = Math.max(conflictJobs.length, conflicts.length)
   const readyCount = pendingJobs.filter((job) => isJobReady(job)).length
   const waitingRetryCount = pendingJobs.length - readyCount
   const state = await getSyncState(userId)
@@ -251,11 +309,23 @@ async function buildStatus(userId) {
 
   if (!isOnline()) {
     return {
-      state: 'offline',
+      state: conflictCount > 0 ? 'conflict' : 'offline',
       pendingCount: pendingJobs.length + failedJobs.length,
       pendingDeleteCount,
+      conflictCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? null,
+    }
+  }
+
+  if (conflictCount > 0) {
+    return {
+      state: 'conflict',
+      pendingCount: pendingJobs.length + failedJobs.length + conflictJobs.length,
+      pendingDeleteCount,
+      conflictCount,
+      lastSyncedAt: state?.lastSyncedAt ?? null,
+      error: null,
     }
   }
 
@@ -264,6 +334,7 @@ async function buildStatus(userId) {
       state: 'error',
       pendingCount: pendingJobs.length + failedJobs.length,
       pendingDeleteCount,
+      conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? 'Sync failed.',
     }
@@ -274,6 +345,7 @@ async function buildStatus(userId) {
       state: 'syncing',
       pendingCount: pendingJobs.length,
       pendingDeleteCount,
+      conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
     }
@@ -284,6 +356,7 @@ async function buildStatus(userId) {
       state: waitingRetryCount > 0 && readyCount === 0 ? 'waiting' : 'pending',
       pendingCount: pendingJobs.length,
       pendingDeleteCount,
+      conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
     }
@@ -293,6 +366,7 @@ async function buildStatus(userId) {
     state: 'up-to-date',
     pendingCount: 0,
     pendingDeleteCount: 0,
+    conflictCount: 0,
     lastSyncedAt: state?.lastSyncedAt ?? null,
     error: null,
   }

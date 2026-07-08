@@ -1,6 +1,7 @@
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
 import { clearSyncQueueForUser } from '../db/syncQueueService'
+import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevisionService'
 import {
   uploadCloudArtworkOriginal,
   uploadCloudArtworkThumbnail,
@@ -41,7 +42,12 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
   })
 
   if (folders.length > 0) {
-    await uploadCloudFolders(folders.map(toCloudFolder))
+    const response = await uploadCloudFolders(folders.map((folder) => toCloudFolder(folder, { force: true })))
+    for (const result of response.results ?? []) {
+      if (result.revision) {
+        await setFolderCloudRevision(result.id, result.revision)
+      }
+    }
   }
 
   onProgress?.({
@@ -53,7 +59,14 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
 
   for (let index = 0; index < artworks.length; index += METADATA_BATCH_SIZE) {
     const batch = artworks.slice(index, index + METADATA_BATCH_SIZE)
-    await uploadCloudArtworks(batch.map(toCloudArtworkMetadata))
+    const response = await uploadCloudArtworks(
+      batch.map((artwork) => toCloudArtworkMetadata(artwork, { force: true })),
+    )
+    for (const result of response.results ?? []) {
+      if (result.revision) {
+        await setArtworkCloudRevision(result.id, result.revision)
+      }
+    }
     onProgress?.({
       phase: 'metadata',
       message: 'Saving artwork details...',

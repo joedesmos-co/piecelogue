@@ -6,8 +6,8 @@ export default function ContactPage() {
   return (
     <PublicPageLayout title="Contact">
       <p>
-        Have a question about {APP_NAME}, privacy, or how the local-first app
-        works? We&apos;d like to hear from you.
+        Have a question about {APP_NAME}, privacy, cloud sync, or how the local-first app works?
+        We&apos;d like to hear from you.
       </p>
 
       <h2>Email</h2>

@@ -44,7 +44,12 @@ export default function CloudRestoreSection({ authenticated }) {
               device.
             </p>
             <div className="account-actions">
-              <button type="button" className="btn btn--primary btn--sm" onClick={restoreNow}>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={restoreNow}
+                disabled={isRestoring}
+              >
                 Restore from cloud
               </button>
               <button type="button" className="btn btn--secondary btn--sm" onClick={keepDevice}>
@@ -53,7 +58,13 @@ export default function CloudRestoreSection({ authenticated }) {
             </div>
           </div>
         ) : !showActiveState ? (
-          <button type="button" className="btn btn--secondary btn--sm" onClick={restoreNow}>
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            onClick={restoreNow}
+            disabled={isRestoring || isChecking}
+            aria-busy={isRestoring || isChecking}
+          >
             Restore from cloud
           </button>
         ) : null}

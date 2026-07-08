@@ -65,6 +65,20 @@ describe('restore mappers', () => {
 
     assert.equal(folder.id, 'folder-uuid-1')
     assert.equal(folder.parentFolderId, 'folder-uuid-root')
+    assert.equal(folder.cloudRevision, 1)
+  })
+
+  it('stores cloud revision from restore payloads', () => {
+    const folder = toLocalFolder({
+      id: 'folder-uuid-1',
+      name: 'Sketches',
+      parentFolderId: null,
+      revision: 6,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    assert.equal(folder.cloudRevision, 6)
   })
 
   it('normalizes artwork metadata with local field shapes', () => {
@@ -89,6 +103,23 @@ describe('restore mappers', () => {
     assert.equal(artwork.folderId, 'folder-uuid-1')
     assert.equal(artwork.favorite, true)
     assert.equal(artwork.totalMinutes, 150)
+    assert.equal(artwork.cloudRevision, 1)
+  })
+
+  it('stores artwork cloud revision from restore payloads', () => {
+    const artwork = toLocalArtworkMetadata({
+      id: 'artwork-uuid-1',
+      folderId: null,
+      title: 'Study',
+      mediumType: 'Traditional',
+      medium: 'Ink',
+      status: 'In Progress',
+      revision: 9,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+
+    assert.equal(artwork.cloudRevision, 9)
   })
 })
 

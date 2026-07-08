@@ -4,7 +4,14 @@ import { X } from 'lucide-react'
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export default function Modal({ isOpen, onClose, title, children, className = '' }) {
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  className = '',
+  closeOnBackdrop = true,
+}) {
   const dialogRef = useRef(null)
   const closeButtonRef = useRef(null)
   const previousFocusRef = useRef(null)
@@ -69,7 +76,11 @@ export default function Modal({ isOpen, onClose, title, children, className = ''
   if (!isOpen) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose} role="presentation">
+    <div
+      className="modal-overlay"
+      onClick={closeOnBackdrop ? onClose : undefined}
+      role="presentation"
+    >
       <div
         ref={dialogRef}
         className={`modal ${className}`}

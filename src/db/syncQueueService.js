@@ -1,4 +1,5 @@
 import { db } from './database'
+import { removeSyncConflict } from './syncConflictService'
 import { SYNC_ENTITY_TYPES, SYNC_JOB_STATUS } from '../sync/constants'
 import { buildCoalescedJob } from '../sync/queueLogic'
 
@@ -54,6 +55,13 @@ export async function enqueueSyncJob(userId, entityType, entityId) {
   const now = new Date().toISOString()
   const existing = await getSyncJob(userId, entityType, entityId)
   const job = buildCoalescedJob(existing, { userId, entityType, entityId, now })
+
+  if (
+    existing?.status === SYNC_JOB_STATUS.CONFLICT ||
+    (entityType === SYNC_ENTITY_TYPES.FOLDER || entityType === SYNC_ENTITY_TYPES.ARTWORK)
+  ) {
+    await removeSyncConflict(userId, entityType, entityId)
+  }
 
   if (existing?.id) {
     await db.syncQueue.put({ ...job, id: existing.id })

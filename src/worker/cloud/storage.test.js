@@ -33,6 +33,7 @@ describe('cloud library row mapping', () => {
 
     assert.equal(folder.id, 'folder-1')
     assert.equal(folder.parentFolderId, 'folder-root')
+    assert.equal(folder.revision, 1)
 
     const topLevel = mapCloudFolderRow({
       id: 'folder-2',
@@ -68,6 +69,7 @@ describe('cloud library row mapping', () => {
     assert.equal(artwork.hasThumbnail, false)
     assert.equal(artwork.favorite, true)
     assert.equal(artwork.folderId, 'folder-1')
+    assert.equal(artwork.revision, 1)
     assert.equal('original_object_key' in artwork, false)
   })
 })

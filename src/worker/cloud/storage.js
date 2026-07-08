@@ -1,5 +1,10 @@
 import { IMAGE_EXTENSION_BY_TYPE } from './constants.js'
 import { nowIso } from '../auth/tokens.js'
+import {
+  buildConflictRecord,
+  evaluateRevisionConflict,
+  normalizeBaseRevision,
+} from '../../sync/conflictLogic.js'
 
 export const CLOUD_LIBRARY_ACTIVE_FILTER = 'deleted_at IS NULL'
 
@@ -58,17 +63,40 @@ function normalizeArtworkMetadata(artwork) {
   }
 }
 
+function normalizeFolderInput(rawFolder) {
+  const folder = normalizeFolder(rawFolder)
+  return {
+    folder,
+    baseRevision: normalizeBaseRevision(rawFolder.baseRevision),
+    force: Boolean(rawFolder.force),
+  }
+}
+
+function normalizeArtworkInput(rawArtwork) {
+  const artwork = normalizeArtworkMetadata(rawArtwork)
+  return {
+    artwork,
+    baseRevision: normalizeBaseRevision(rawArtwork.baseRevision),
+    force: Boolean(rawArtwork.force),
+  }
+}
+
 export async function upsertCloudFolders(db, userId, folders) {
   if (!Array.isArray(folders)) {
     throw new Error('folders must be an array.')
   }
 
-  let saved = 0
+  const results = []
+  const conflicts = []
 
   for (const rawFolder of folders) {
-    const folder = normalizeFolder(rawFolder)
+    const { folder, baseRevision, force } = normalizeFolderInput(rawFolder)
     const existing = await db
-      .prepare('SELECT id, user_id FROM folders WHERE id = ?')
+      .prepare(
+        `SELECT id, user_id, name, parent_folder_id, created_at, updated_at, deleted_at, revision
+         FROM folders
+         WHERE id = ?`,
+      )
       .bind(folder.id)
       .first()
 
@@ -76,20 +104,37 @@ export async function upsertCloudFolders(db, userId, folders) {
       throw new Error('Folder id is already used by another account.')
     }
 
+    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, { force })
+    if (revisionConflict) {
+      conflicts.push(
+        buildConflictRecord({
+          id: folder.id,
+          baseRevision,
+          cloudRevision: revisionConflict.cloudRevision,
+          cloud: mapCloudFolderRow(existing),
+          reason: revisionConflict.reason,
+        }),
+      )
+      continue
+    }
+
     if (existing) {
+      const newRevision = (existing.revision ?? 1) + 1
       await db
         .prepare(
           `UPDATE folders
-           SET name = ?, parent_folder_id = ?, updated_at = ?, deleted_at = NULL
+           SET name = ?, parent_folder_id = ?, updated_at = ?, deleted_at = NULL, revision = ?
            WHERE id = ? AND user_id = ?`,
         )
-        .bind(folder.name, folder.parentFolderId, folder.updatedAt, folder.id, userId)
+        .bind(folder.name, folder.parentFolderId, folder.updatedAt, newRevision, folder.id, userId)
         .run()
+      results.push({ id: folder.id, revision: newRevision })
     } else {
       await db
         .prepare(
-          `INSERT INTO folders (id, user_id, name, parent_folder_id, created_at, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+          `INSERT INTO folders (
+             id, user_id, name, parent_folder_id, created_at, updated_at, deleted_at, revision
+           ) VALUES (?, ?, ?, ?, ?, ?, NULL, 1)`,
         )
         .bind(
           folder.id,
@@ -100,12 +145,11 @@ export async function upsertCloudFolders(db, userId, folders) {
           folder.updatedAt,
         )
         .run()
+      results.push({ id: folder.id, revision: 1 })
     }
-
-    saved += 1
   }
 
-  return { saved }
+  return { saved: results.length, results, conflicts }
 }
 
 export async function upsertCloudArtworks(db, userId, artworks) {
@@ -113,13 +157,17 @@ export async function upsertCloudArtworks(db, userId, artworks) {
     throw new Error('artworks must be an array.')
   }
 
-  let saved = 0
+  const results = []
+  const conflicts = []
 
   for (const rawArtwork of artworks) {
-    const artwork = normalizeArtworkMetadata(rawArtwork)
+    const { artwork, baseRevision, force } = normalizeArtworkInput(rawArtwork)
     const existing = await db
       .prepare(
-        `SELECT id, user_id, original_object_key, thumbnail_object_key
+        `SELECT id, user_id, folder_id, title, medium_type, medium, status,
+                hours, minutes, total_minutes, artwork_date, notes, favorite,
+                original_object_key, thumbnail_object_key,
+                created_at, updated_at, deleted_at, revision
          FROM artworks
          WHERE id = ?`,
       )
@@ -130,7 +178,22 @@ export async function upsertCloudArtworks(db, userId, artworks) {
       throw new Error('Artwork id is already used by another account.')
     }
 
+    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, { force })
+    if (revisionConflict) {
+      conflicts.push(
+        buildConflictRecord({
+          id: artwork.id,
+          baseRevision,
+          cloudRevision: revisionConflict.cloudRevision,
+          cloud: mapCloudArtworkRow(existing),
+          reason: revisionConflict.reason,
+        }),
+      )
+      continue
+    }
+
     if (existing) {
+      const newRevision = (existing.revision ?? 1) + 1
       await db
         .prepare(
           `UPDATE artworks
@@ -146,7 +209,8 @@ export async function upsertCloudArtworks(db, userId, artworks) {
                notes = ?,
                favorite = ?,
                updated_at = ?,
-               deleted_at = NULL
+               deleted_at = NULL,
+               revision = ?
            WHERE id = ? AND user_id = ?`,
         )
         .bind(
@@ -162,10 +226,12 @@ export async function upsertCloudArtworks(db, userId, artworks) {
           artwork.notes,
           artwork.favorite,
           artwork.updatedAt,
+          newRevision,
           artwork.id,
           userId,
         )
         .run()
+      results.push({ id: artwork.id, revision: newRevision })
     } else {
       await db
         .prepare(
@@ -173,8 +239,8 @@ export async function upsertCloudArtworks(db, userId, artworks) {
              id, user_id, folder_id, title, medium_type, medium, status,
              hours, minutes, total_minutes, artwork_date, notes, favorite,
              original_object_key, thumbnail_object_key,
-             created_at, updated_at, deleted_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, NULL)`,
+             created_at, updated_at, deleted_at, revision
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, NULL, 1)`,
         )
         .bind(
           artwork.id,
@@ -194,12 +260,11 @@ export async function upsertCloudArtworks(db, userId, artworks) {
           artwork.updatedAt,
         )
         .run()
+      results.push({ id: artwork.id, revision: 1 })
     }
-
-    saved += 1
   }
 
-  return { saved }
+  return { saved: results.length, results, conflicts }
 }
 
 export function getArtworkObjectKeys(row) {
@@ -285,6 +350,78 @@ export async function softDeleteCloudArtwork(db, bucket, userId, artworkId) {
   return { deletedAt, r2Deleted }
 }
 
+export async function deleteAllUserCloudData(db, bucket, userId) {
+  const artworkResult = await db
+    .prepare(
+      `SELECT id, original_object_key, thumbnail_object_key, deleted_at
+       FROM artworks
+       WHERE user_id = ?`,
+    )
+    .bind(userId)
+    .all()
+
+  const deletedAt = nowIso()
+  let artworksTombstoned = 0
+  let r2Deleted = 0
+
+  for (const row of artworkResult?.results ?? []) {
+    const objectKeys = getArtworkObjectKeys(row)
+
+    if (!row.deleted_at) {
+      await db
+        .prepare(
+          `UPDATE artworks
+           SET deleted_at = ?,
+               updated_at = ?,
+               original_object_key = NULL,
+               thumbnail_object_key = NULL
+           WHERE id = ? AND user_id = ?`,
+        )
+        .bind(deletedAt, deletedAt, row.id, userId)
+        .run()
+      artworksTombstoned += 1
+    } else if (objectKeys.length > 0) {
+      await db
+        .prepare(
+          `UPDATE artworks
+           SET original_object_key = NULL,
+               thumbnail_object_key = NULL
+           WHERE id = ? AND user_id = ?`,
+        )
+        .bind(row.id, userId)
+        .run()
+    }
+
+    if (bucket && objectKeys.length > 0) {
+      for (const objectKey of objectKeys) {
+        try {
+          await bucket.delete(objectKey)
+          r2Deleted += 1
+        } catch {
+          // R2 cleanup is best-effort after D1 tombstone is set.
+        }
+      }
+    }
+  }
+
+  const folderResult = await db
+    .prepare(
+      `UPDATE folders
+       SET deleted_at = ?, updated_at = ?
+       WHERE user_id = ? AND deleted_at IS NULL`,
+    )
+    .bind(deletedAt, deletedAt, userId)
+    .run()
+
+  const foldersTombstoned = folderResult?.meta?.changes ?? 0
+
+  return {
+    artworksTombstoned,
+    foldersTombstoned,
+    r2Deleted,
+  }
+}
+
 export async function assertArtworkOwnedByUser(db, userId, artworkId) {
   const row = await db
     .prepare(
@@ -345,6 +482,7 @@ export function mapCloudFolderRow(row) {
     id: row.id,
     name: row.name,
     parentFolderId: row.parent_folder_id ?? null,
+    revision: row.revision ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -364,6 +502,7 @@ export function mapCloudArtworkRow(row) {
     artworkDate: row.artwork_date ?? null,
     notes: row.notes || '',
     favorite: Boolean(row.favorite),
+    revision: row.revision ?? 1,
     hasOriginal: Boolean(row.original_object_key),
     hasThumbnail: Boolean(row.thumbnail_object_key),
     createdAt: row.created_at,
@@ -374,7 +513,7 @@ export function mapCloudArtworkRow(row) {
 export async function getCloudLibrary(db, userId) {
   const folderResult = await db
     .prepare(
-      `SELECT id, name, parent_folder_id, created_at, updated_at
+      `SELECT id, name, parent_folder_id, revision, created_at, updated_at
        FROM folders
        WHERE user_id = ? AND deleted_at IS NULL
        ORDER BY created_at`,
@@ -385,7 +524,7 @@ export async function getCloudLibrary(db, userId) {
   const artworkResult = await db
     .prepare(
       `SELECT id, folder_id, title, medium_type, medium, status,
-              hours, minutes, total_minutes, artwork_date, notes, favorite,
+              hours, minutes, total_minutes, artwork_date, notes, favorite, revision,
               original_object_key, thumbnail_object_key, created_at, updated_at
        FROM artworks
        WHERE user_id = ? AND deleted_at IS NULL

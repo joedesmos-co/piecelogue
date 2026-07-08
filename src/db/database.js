@@ -100,3 +100,25 @@ db.version(5).stores({
   syncImageHashes: '&id, userId, artworkId',
   syncState: 'userId',
 })
+
+db.version(6).stores({
+  folders: 'id, parentFolderId, name, createdAt, updatedAt, cloudRevision',
+  artworks:
+    'id, title, mediumType, medium, folderId, status, favorite, artworkDate, createdAt, updatedAt, totalMinutes, cloudRevision',
+  syncQueue:
+    '++id, &[userId+entityType+entityId], userId, entityType, entityId, priority, status, nextRetryAt, updatedAt',
+  syncImageHashes: '&id, userId, artworkId',
+  syncState: 'userId',
+  syncConflicts: '&id, userId, entityType, entityId, jobId',
+}).upgrade(async (tx) => {
+  await tx.table('folders').toCollection().modify((folder) => {
+    if (folder.cloudRevision === undefined) {
+      folder.cloudRevision = 0
+    }
+  })
+  await tx.table('artworks').toCollection().modify((artwork) => {
+    if (artwork.cloudRevision === undefined) {
+      artwork.cloudRevision = 0
+    }
+  })
+})

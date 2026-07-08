@@ -17,6 +17,7 @@ export const SYNC_PRIORITIES = {
 export const SYNC_JOB_STATUS = {
   PENDING: 'pending',
   FAILED: 'failed',
+  CONFLICT: 'conflict',
 }
 
 export const MAX_IMAGE_UPLOAD_CONCURRENCY = 2

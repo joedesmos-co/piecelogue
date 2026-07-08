@@ -3,6 +3,7 @@ export function toLocalFolder(cloudFolder) {
     id: cloudFolder.id,
     name: cloudFolder.name,
     parentFolderId: cloudFolder.parentFolderId ?? null,
+    cloudRevision: cloudFolder.revision ?? 1,
     createdAt: cloudFolder.createdAt,
     updatedAt: cloudFolder.updatedAt,
   }
@@ -22,6 +23,7 @@ export function toLocalArtworkMetadata(cloudArtwork) {
     artworkDate: cloudArtwork.artworkDate ?? null,
     notes: cloudArtwork.notes ?? '',
     favorite: Boolean(cloudArtwork.favorite),
+    cloudRevision: cloudArtwork.revision ?? 1,
     createdAt: cloudArtwork.createdAt,
     updatedAt: cloudArtwork.updatedAt,
   }

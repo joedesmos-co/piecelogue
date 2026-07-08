@@ -46,7 +46,7 @@ npm run build
 npx wrangler deploy
 ```
 
-Static files (`sitemap.xml`, `robots.txt`, `ads.txt`) are copied from `public/` into `dist/` during build.
+Static files (`sitemap.xml`, `robots.txt`) are copied from `public/` into `dist/` during build.
 
 ## Cloudflare Workers foundation (Phase 2)
 

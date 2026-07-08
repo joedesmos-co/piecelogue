@@ -17,6 +17,7 @@ const INITIAL_STATUS = {
   state: 'signed-out',
   pendingCount: 0,
   pendingDeleteCount: 0,
+  conflictCount: 0,
   lastSyncedAt: null,
   error: null,
 }

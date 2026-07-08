@@ -28,4 +28,11 @@ describe('formatUserError', () => {
       'That username is already taken.',
     )
   })
+
+  it('maps network failures to friendly offline/sync messages', () => {
+    assert.equal(
+      formatUserError(new TypeError('Failed to fetch')),
+      'Could not reach Piecelogue. Check your connection — your local library is safe.',
+    )
+  })
 })

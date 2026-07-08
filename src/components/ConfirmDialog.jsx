@@ -15,7 +15,7 @@ export default function ConfirmDialog({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={title} className="modal--small">
+    <Modal isOpen={isOpen} onClose={handleClose} closeOnBackdrop={!busy} title={title} className="modal--small">
       <p className="confirm-message">{message}</p>
       <div className="form-actions">
         <button

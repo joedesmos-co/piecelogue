@@ -7,9 +7,10 @@ import {
   buildCoalescedJob,
   filterJobsForActiveUser,
   isDeleteSyncEntityType,
+  isJobReady,
   sortSyncJobs,
 } from '../sync/queueLogic.js'
-import { SYNC_ENTITY_TYPES } from '../sync/constants.js'
+import { SYNC_ENTITY_TYPES, SYNC_JOB_STATUS } from '../sync/constants.js'
 import {
   buildRetryUpdate,
   classifySyncError,
@@ -173,6 +174,14 @@ describe('sync image hash deduplication', () => {
   it('hashes buffers deterministically for upload comparisons', () => {
     const hash = createHash('sha256').update('piecelogue').digest('hex')
     assert.equal(hash.length, 64)
+  })
+})
+
+describe('sync job readiness', () => {
+  it('does not process failed or conflict jobs', () => {
+    assert.equal(isJobReady({ status: SYNC_JOB_STATUS.FAILED }), false)
+    assert.equal(isJobReady({ status: SYNC_JOB_STATUS.CONFLICT }), false)
+    assert.equal(isJobReady({ status: SYNC_JOB_STATUS.PENDING }), true)
   })
 })
 

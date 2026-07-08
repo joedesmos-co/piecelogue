@@ -3,7 +3,7 @@ import Modal from './Modal'
 import { useAuth } from '../hooks/useAuth'
 import { formatUserError } from '../utils/userErrors'
 
-function SignInForm({ onClose }) {
+function SignInForm({ onClose, onSubmittingChange }) {
   const { requestLink } = useAuth()
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -15,6 +15,7 @@ function SignInForm({ onClose }) {
     event.preventDefault()
     setError('')
     setSubmitting(true)
+    onSubmittingChange?.(true)
 
     try {
       const result = await requestLink(email.trim())
@@ -24,6 +25,7 @@ function SignInForm({ onClose }) {
       setError(formatUserError(err, 'Unable to send a sign-in link. Please try again.'))
     } finally {
       setSubmitting(false)
+      onSubmittingChange?.(false)
     }
   }
 
@@ -96,8 +98,28 @@ function SignInForm({ onClose }) {
 
 export default function SignInDialog({ isOpen, onClose }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Sign in with email" className="modal--small">
-      {isOpen ? <SignInForm key="sign-in" onClose={onClose} /> : null}
+    <SignInDialogInner isOpen={isOpen} onClose={onClose} />
+  )
+}
+
+function SignInDialogInner({ isOpen, onClose }) {
+  const [submitting, setSubmitting] = useState(false)
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={submitting ? () => {} : onClose}
+      closeOnBackdrop={!submitting}
+      title="Sign in with email"
+      className="modal--small"
+    >
+      {isOpen ? (
+        <SignInForm
+          key="sign-in"
+          onClose={onClose}
+          onSubmittingChange={setSubmitting}
+        />
+      ) : null}
     </Modal>
   )
 }

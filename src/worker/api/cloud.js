@@ -13,6 +13,12 @@ import {
   upsertCloudFolders,
 } from '../cloud/storage.js'
 import { requireAuthenticatedUser } from '../auth/requireUser.js'
+import { logError } from '../log.js'
+import {
+  buildUserRateLimitKey,
+  checkRateLimit,
+  RATE_LIMITS,
+} from '../rateLimit.js'
 import { jsonError, jsonOk, methodNotAllowed } from '../http.js'
 
 class InvalidJsonError extends Error {
@@ -223,6 +229,17 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
     return withCloudHeaders(jsonError(400, 'invalid_image', 'Image body is empty.'))
   }
 
+  const rateLimit = await checkRateLimit(
+    env.DB,
+    buildUserRateLimitKey('cloud:image', auth.user.id),
+    RATE_LIMITS.CLOUD_IMAGE_UPLOAD,
+  )
+  if (!rateLimit.allowed) {
+    return withCloudHeaders(
+      jsonError(429, 'rate_limit', 'Too many image uploads. Please wait and try again.'),
+    )
+  }
+
   try {
     const result =
       imageType === 'thumbnail'
@@ -237,7 +254,7 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
       }),
     )
   } catch (error) {
-    console.error('[Piecelogue] Cloud image upload failed:', error?.message || error)
+    logError('cloud.image_upload', error, { artworkId, imageType, userId: auth.user.id })
     return withCloudHeaders(
       jsonError(500, 'upload_failed', 'Failed to save image to cloud storage.'),
     )

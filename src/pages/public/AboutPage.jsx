@@ -18,16 +18,17 @@ export default function AboutPage() {
         <li>Mark favorites and update status as work progresses</li>
       </ul>
 
-      <h2>Local-first by design</h2>
+      <h2>Local-first with optional cloud sync</h2>
       <p>
-        The current version of {APP_NAME} stores your artwork images and metadata
-        locally in your browser using IndexedDB. Your creative library stays on the
-        device and browser you use. Refreshing the page keeps your saved work, but
-        clearing browser data can remove it.
+        {APP_NAME} stores your artwork images and metadata locally in your browser using IndexedDB.
+        Your creative library stays on the device and browser you use. Refreshing the page keeps
+        your saved work, but clearing browser data can remove it — export a backup from Settings for
+        extra safety.
       </p>
       <p>
-        {APP_NAME} does not currently offer cloud accounts, cloud sync, public
-        portfolios, payments, subscriptions, or AI features.
+        You can sign in to sync your library to your Piecelogue account. Cloud sync uploads changes
+        in the background and lets you restore on another device. During beta, Piecelogue does not
+        offer public sharing, payments, subscriptions, ads, or AI features inside the app.
       </p>
 
       <h2>Built for creative progress</h2>

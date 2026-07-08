@@ -40,7 +40,7 @@ export const PAGE_SEO = {
     path: '/privacy',
     title: 'Privacy Policy — Piecelogue',
     description:
-      'How Piecelogue handles your artwork, local browser storage, hosting, and future advertising-related services.',
+      'How Piecelogue handles local browser storage, optional cloud backup, account data, and hosting.',
     ogType: 'website',
   },
   terms: {

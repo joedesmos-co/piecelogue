@@ -48,7 +48,7 @@ export function sortSyncJobs(jobs) {
 }
 
 export function isJobReady(job, now = Date.now()) {
-  if (job.status === 'failed') {
+  if (job.status === 'failed' || job.status === 'conflict') {
     return false
   }
   if (!job.nextRetryAt) {

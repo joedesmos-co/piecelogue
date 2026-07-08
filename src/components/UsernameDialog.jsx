@@ -81,7 +81,13 @@ export default function UsernameDialog({
   saving = false,
 }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} className="modal--small">
+    <Modal
+      isOpen={isOpen}
+      onClose={saving ? () => {} : onClose}
+      closeOnBackdrop={!saving}
+      title={title}
+      className="modal--small"
+    >
       {isOpen ? (
         <UsernameForm
           key={`${title}-${initialUsername}`}

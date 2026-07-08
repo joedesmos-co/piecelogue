@@ -53,6 +53,14 @@ function getStatusDetails(status, forcing) {
         label: 'Sync error',
         description: status.error || 'Some changes could not be synced to the cloud.',
       }
+    case 'conflict':
+      return {
+        label: 'Sync conflict — review needed',
+        description:
+          status.conflictCount > 1
+            ? `${status.conflictCount} items need your review before sync can continue.`
+            : 'An item was changed on another device. Review the conflict below.',
+      }
     default:
       return { label: null, description: null }
   }

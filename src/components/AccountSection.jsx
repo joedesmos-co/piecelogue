@@ -168,6 +168,7 @@ export default function AccountSection() {
                   type="button"
                   className="btn btn--primary account-google-btn"
                   onClick={startGoogleSignIn}
+                  aria-label="Continue with Google"
                 >
                   Continue with Google
                 </button>
