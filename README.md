@@ -48,6 +48,43 @@ npx wrangler deploy
 
 Static files (`sitemap.xml`, `robots.txt`, `ads.txt`) are copied from `public/` into `dist/` during build.
 
+## Cloudflare Workers foundation (Phase 2)
+
+This project is deployed using Cloudflare Workers + “Static Assets”, with a Worker entry point at `src/worker/index.js`.
+
+- Static assets (the SPA) are served from `./dist`
+- API routes under `/api/*` are handled by the Worker
+- `GET /api/health` returns:
+  - `ok: true`
+  - `app: "Piecelogue"`
+  - `version: "0.1.0"`
+
+### D1 + R2 placeholders
+
+`wrangler.jsonc` includes placeholder bindings for:
+
+- D1 database binding: `DB`
+- R2 bucket binding: `ARTWORK_BUCKET`
+
+You must create the D1 database and R2 bucket in Cloudflare and then replace the placeholder values in `wrangler.jsonc`.
+
+### Create D1 and apply migrations (later)
+
+```bash
+npx wrangler d1 create piecelogue
+npx wrangler d1 migrations apply piecelogue --remote
+```
+
+Migrations live in `./migrations`.
+
+### Create R2 bucket (later)
+
+```bash
+npx wrangler r2 bucket create piecelogue-artworks
+```
+
+Replace `bucket_name` in `wrangler.jsonc` with the exact created bucket name.
+
 ## Data storage
 
 The current version stores all artwork images and metadata locally in your browser. There is no cloud sync or user accounts yet. Clearing browser data may remove your library. The app at `/app` uses the same origin IndexedDB as before — moving routes does not reset data.

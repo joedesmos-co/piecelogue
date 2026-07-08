@@ -1,8 +1,24 @@
 {
   "name": "piecelogue",
   "compatibility_date": "2026-07-08",
+  "main": "src/worker/index.js",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "piecelogue",
+      "database_id": "13a3e582-9a1b-4c50-8a1f-66777b81552c",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ARTWORK_BUCKET",
+      "bucket_name": "piecelogue-artwork"
+    }
+  ]
 }
