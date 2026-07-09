@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react'
 import { APP_NAME, APP_TAGLINE } from '../utils/constants'
+import { navigate } from '../utils/navigation'
 import { BottomNav, Sidebar } from './Navigation'
 import SiteFooter from './SiteFooter'
 
@@ -19,10 +20,15 @@ export default function AppShell({
 
       <div className="app-main">
         <header className="mobile-header">
-          <div className="mobile-header-brand">
+          <button
+            type="button"
+            className="mobile-header-brand brand-home-link"
+            onClick={() => navigate('/')}
+            aria-label={`${APP_NAME} home`}
+          >
             <h1 className="mobile-header-title">{APP_NAME}</h1>
             <p className="mobile-header-tagline">{APP_TAGLINE}</p>
-          </div>
+          </button>
           <button
             type="button"
             className="mobile-header-add"

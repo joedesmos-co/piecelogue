@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchMe, logout, requestSignInLink } from '../api/auth'
+import { clearSignedOutLibraryFlag } from '../utils/clearLocalLibrary'
 import { AuthContext } from './authContext'
 
 function clearAuthSuccessQuery() {
@@ -25,6 +26,9 @@ export function AuthProvider({ children }) {
       const result = await fetchMe()
       setAuthenticated(result.authenticated)
       setUser(result.user)
+      if (result.authenticated) {
+        clearSignedOutLibraryFlag()
+      }
       return result
     } catch (err) {
       setError(err.message || 'Failed to load account.')
@@ -48,6 +52,9 @@ export function AuthProvider({ children }) {
         if (!cancelled) {
           setAuthenticated(result.authenticated)
           setUser(result.user)
+          if (result.authenticated) {
+            clearSignedOutLibraryFlag()
+          }
         }
       } catch (err) {
         if (!cancelled) {

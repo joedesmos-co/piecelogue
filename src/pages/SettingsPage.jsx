@@ -7,7 +7,6 @@ import {
   readBackupFile,
 } from '../utils/localBackup'
 import { formatUserError } from '../utils/userErrors'
-import LocalFirstExplainer from '../components/LocalFirstExplainer'
 import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function SettingsPage() {
@@ -102,7 +101,6 @@ export default function SettingsPage() {
           Local-first &amp; cloud sync
         </h3>
         <div className="settings-card">
-          <LocalFirstExplainer />
           <div className="settings-warning" role="note">
             <Info size={16} aria-hidden="true" />
             <p>

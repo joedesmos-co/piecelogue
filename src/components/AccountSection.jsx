@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { LogOut, User } from 'lucide-react'
 import { fetchProfile, updateUsername } from '../api/profile'
 import { useAuth } from '../hooks/useAuth'
+import { useArtworks } from '../hooks/useArtworks'
+import {
+  clearLocalLibrary,
+  markSignedOutLibraryCleared,
+} from '../utils/clearLocalLibrary'
 import { formatUserError } from '../utils/userErrors'
+import ConfirmDialog from './ConfirmDialog'
 import SignInDialog from './SignInDialog'
 import UsernameDialog from './UsernameDialog'
 
@@ -19,6 +25,7 @@ function formatHandle(username) {
 
 export default function AccountSection() {
   const { authenticated, user, loading, error, signOut } = useAuth()
+  const { refresh: refreshArtworks } = useArtworks()
   const [profile, setProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -27,6 +34,7 @@ export default function AccountSection() {
   const [savingUsername, setSavingUsername] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
   useEffect(() => {
     if (!authenticated) {
@@ -61,13 +69,17 @@ export default function AccountSection() {
     }
   }, [authenticated, user?.id])
 
-  async function handleSignOut() {
+  async function handleConfirmSignOut() {
     setSignOutError('')
     setSigningOut(true)
 
     try {
       await signOut()
+      await clearLocalLibrary()
+      markSignedOutLibraryCleared()
+      await refreshArtworks()
       setProfile(null)
+      setShowSignOutConfirm(false)
     } catch (err) {
       setSignOutError(formatUserError(err, 'Unable to sign out. Please try again.'))
     } finally {
@@ -143,7 +155,7 @@ export default function AccountSection() {
                 <button
                   type="button"
                   className="btn btn--secondary btn--sm"
-                  onClick={handleSignOut}
+                  onClick={() => setShowSignOutConfirm(true)}
                   disabled={signingOut}
                 >
                   <LogOut size={16} aria-hidden="true" />
@@ -193,6 +205,21 @@ export default function AccountSection() {
         initialUsername={username ?? ''}
         title={usernameDialogTitle}
         saving={savingUsername}
+      />
+
+      <ConfirmDialog
+        isOpen={showSignOutConfirm}
+        onClose={() => {
+          if (!signingOut) {
+            setShowSignOutConfirm(false)
+          }
+        }}
+        onConfirm={handleConfirmSignOut}
+        title="Sign out?"
+        message="Your session will end and this device’s local library will be removed. Your cloud backup is not changed — sign in again to restore from cloud."
+        confirmLabel={signingOut ? 'Signing out...' : 'Sign out'}
+        confirmVariant="primary"
+        busy={signingOut}
       />
     </>
   )

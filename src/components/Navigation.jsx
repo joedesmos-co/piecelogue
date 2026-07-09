@@ -1,5 +1,6 @@
 import { Images, User, Settings, Plus } from 'lucide-react'
 import { APP_NAME, PAGES } from '../utils/constants'
+import { navigate } from '../utils/navigation'
 
 const NAV_ITEMS = [
   { id: PAGES.GALLERY, label: 'Gallery', icon: Images },
@@ -38,7 +39,14 @@ export function Sidebar({ currentPage, onNavigate, onAdd }) {
   return (
     <aside className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand">
-        <span className="sidebar-logo">{APP_NAME}</span>
+        <button
+          type="button"
+          className="sidebar-logo brand-home-link"
+          onClick={() => navigate('/')}
+          aria-label={`${APP_NAME} home`}
+        >
+          {APP_NAME}
+        </button>
       </div>
 
       <nav className="sidebar-nav">

@@ -14,7 +14,6 @@ import CloudRestoreSection from '../components/CloudRestoreSection'
 import CloudConflictSection from '../components/CloudConflictSection'
 import CloudSaveSection from '../components/CloudSaveSection'
 import AccountDataControlsSection from '../components/AccountDataControlsSection'
-import LocalFirstExplainer from '../components/LocalFirstExplainer'
 import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
@@ -40,22 +39,43 @@ export default function ProfilePage() {
   const { authenticated } = useAuth()
   const { artworks, folders } = useArtworks()
   const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const shouldLoadStats = authenticated || artworks.length > 0
 
   useEffect(() => {
+    if (!shouldLoadStats) {
+      return undefined
+    }
+
+    let cancelled = false
+
     async function load() {
+      setLoading(true)
+      setError(null)
+
       try {
         const data = await getStats()
-        setStats(data)
+        if (!cancelled) {
+          setStats(data)
+        }
       } catch (err) {
-        setError(formatUserError(err, 'Failed to load statistics.'))
+        if (!cancelled) {
+          setError(formatUserError(err, 'Failed to load statistics.'))
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
+
     load()
-  }, [artworks])
+
+    return () => {
+      cancelled = true
+    }
+  }, [artworks, shouldLoadStats])
 
   return (
     <div className="page profile-page">
@@ -65,13 +85,6 @@ export default function ProfilePage() {
       </header>
 
       <AccountSection />
-
-      <section className="settings-section">
-        <h3 className="settings-section-title">How Piecelogue works</h3>
-        <div className="settings-card">
-          <LocalFirstExplainer compact />
-        </div>
-      </section>
 
       <CloudRestoreSection authenticated={authenticated} />
 
@@ -93,9 +106,24 @@ export default function ProfilePage() {
           </div>
         ) : null}
 
-        {loading ? <LoadingState message="Calculating stats..." /> : null}
+        {!shouldLoadStats ? (
+          <div className="settings-card settings-card--placeholder profile-stats-empty">
+            <div className="empty-state-icon" aria-hidden="true">
+              <Palette size={36} strokeWidth={1.5} />
+            </div>
+            <h4 className="profile-stats-empty-title">Sign in to see your library</h4>
+            <p className="settings-text settings-text--muted">
+              Lifetime stats appear here when you are signed in or have artwork in your local
+              gallery.
+            </p>
+          </div>
+        ) : null}
 
-        {!loading && stats && stats.totalArtworks === 0 ? (
+        {shouldLoadStats && loading ? (
+          <LoadingState message="Calculating stats..." />
+        ) : null}
+
+        {shouldLoadStats && !loading && stats && stats.totalArtworks === 0 ? (
           <div className="settings-card settings-card--placeholder profile-stats-empty">
             <div className="empty-state-icon" aria-hidden="true">
               <Palette size={36} strokeWidth={1.5} />
@@ -108,7 +136,7 @@ export default function ProfilePage() {
           </div>
         ) : null}
 
-        {!loading && stats && stats.totalArtworks > 0 ? (
+        {shouldLoadStats && !loading && stats && stats.totalArtworks > 0 ? (
           <div className="stats-grid">
             <StatCard
               icon={Folder}

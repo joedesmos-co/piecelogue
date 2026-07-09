@@ -7,14 +7,12 @@ import { useArtworks } from './hooks/useArtworks'
 import AppShell from './components/AppShell'
 import Modal from './components/Modal'
 import ArtworkForm from './components/ArtworkForm'
-import WelcomeDialog from './components/WelcomeDialog'
 import GalleryPage from './pages/GalleryPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import { PAGES } from './utils/constants'
 import { applyPageSeo } from './utils/seo'
 import { PAGE_SEO } from './utils/site'
-import { hasCompletedOnboarding } from './utils/onboarding'
 
 function getInitialPage() {
   const params = new URLSearchParams(window.location.search)
@@ -32,7 +30,6 @@ function AppContent() {
   const [editingArtwork, setEditingArtwork] = useState(null)
   const [defaultFolderId, setDefaultFolderId] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [showWelcome, setShowWelcome] = useState(() => !hasCompletedOnboarding())
 
   useEffect(() => {
     applyPageSeo(PAGE_SEO.app)
@@ -109,13 +106,6 @@ function AppContent() {
           saving={saving}
         />
       </Modal>
-
-      <WelcomeDialog
-        isOpen={showWelcome}
-        onClose={() => setShowWelcome(false)}
-        onAddArtwork={() => handleAdd(null)}
-        onGoToProfile={() => setCurrentPage(PAGES.PROFILE)}
-      />
     </>
   )
 }

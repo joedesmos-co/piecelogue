@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { FolderPlus, ImageIcon } from 'lucide-react'
 import { useArtworks } from '../hooks/useArtworks'
+import { useAuth } from '../hooks/useAuth'
+import { wasLibraryClearedOnSignOut } from '../utils/clearLocalLibrary'
 import { GALLERY_VIEWS } from '../utils/constants'
 import {
   getDescendantFolderIds,
@@ -20,6 +22,7 @@ import GalleryContextMenu from '../components/GalleryContextMenu'
 import LoadingState from '../components/LoadingState'
 
 export default function GalleryPage({ onAdd, onEdit }) {
+  const { authenticated } = useAuth()
   const {
     artworks,
     folders,
@@ -365,7 +368,10 @@ export default function GalleryPage({ onAdd, onEdit }) {
                   </div>
                 ) : null
               ) : view === GALLERY_VIEWS.HOME && !hasAnyArtwork ? (
-                <EmptyState onAdd={() => onAdd(null)} />
+                <EmptyState
+                  onAdd={() => onAdd(null)}
+                  signedOut={!authenticated && wasLibraryClearedOnSignOut()}
+                />
               ) : (
                 <div className="empty-state">
                   <div className="empty-state-icon" aria-hidden="true">
