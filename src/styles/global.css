@@ -1669,6 +1669,23 @@ a.btn--public:hover,
   margin-top: 12px;
 }
 
+.cloud-sync-conflicts,
+.cloud-sync-restore,
+.cloud-sync-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.cloud-sync-actions {
+  margin-top: 12px;
+  padding-top: 0;
+  border-top: none;
+}
+
 .sync-status-banner {
   display: flex;
   align-items: flex-start;

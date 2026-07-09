@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
 import { getSyncConflictsForUser } from '../db/syncConflictService'
 import { useAuth } from '../hooks/useAuth'
 import { useArtworks } from '../hooks/useArtworks'
@@ -24,7 +23,7 @@ function entityLabel(entityType) {
   return entityType === SYNC_ENTITY_TYPES.FOLDER ? 'Folder' : 'Artwork'
 }
 
-export default function CloudConflictSection({ authenticated }) {
+export function CloudConflictPanel() {
   const { user } = useAuth()
   const { refresh } = useArtworks()
   const { status } = useSync()
@@ -49,7 +48,7 @@ export default function CloudConflictSection({ authenticated }) {
   }, [user?.id])
 
   useEffect(() => {
-    if (!authenticated || !user?.id) {
+    if (!user?.id) {
       return undefined
     }
 
@@ -74,7 +73,7 @@ export default function CloudConflictSection({ authenticated }) {
     return () => {
       cancelled = true
     }
-  }, [authenticated, user?.id, status.conflictCount])
+  }, [user?.id, status.conflictCount])
 
   async function handleResolve(conflict, choice) {
     if (!user?.id) {
@@ -101,87 +100,76 @@ export default function CloudConflictSection({ authenticated }) {
     }
   }
 
-  if (!authenticated) {
-    return null
-  }
-
   if (!loading && conflicts.length === 0 && status.conflictCount === 0) {
     return null
   }
 
   return (
-    <section className="settings-section" aria-labelledby="cloud-conflicts-heading">
-      <h3 id="cloud-conflicts-heading" className="settings-section-title">
-        <AlertTriangle size={18} />
-        Sync conflicts
-      </h3>
+    <div className="cloud-sync-conflicts">
+      <p className="settings-text settings-text--muted">
+        The same item was changed on another device. Choose which version to keep for each
+        conflict.
+      </p>
 
-      <div className="settings-card">
-        <p className="settings-text settings-text--muted">
-          The same item was changed on another device. Choose which version to keep for each
-          conflict.
+      {loading && conflicts.length === 0 ? (
+        <p className="settings-text settings-text--muted" role="status">
+          Loading conflicts...
         </p>
+      ) : null}
 
-        {loading && conflicts.length === 0 ? (
-          <p className="settings-text settings-text--muted" role="status">
-            Loading conflicts...
-          </p>
-        ) : null}
+      {error ? (
+        <div className="alert alert--error" role="alert">
+          {error}
+        </div>
+      ) : null}
 
-        {error ? (
-          <div className="alert alert--error" role="alert">
-            {error}
-          </div>
-        ) : null}
+      <ul className="sync-conflict-list">
+        {conflicts.map((conflict) => {
+          const summary = summarizeConflict(conflict)
+          const busy = resolvingId === conflict.id
 
-        <ul className="sync-conflict-list">
-          {conflicts.map((conflict) => {
-            const summary = summarizeConflict(conflict)
-            const busy = resolvingId === conflict.id
+          return (
+            <li key={conflict.id} className="sync-conflict-item">
+              <div className="sync-conflict-item-header">
+                <p className="sync-conflict-title">{summary.title}</p>
+                <p className="settings-text settings-text--muted">
+                  {entityLabel(conflict.entityType)} · cloud revision {conflict.cloudRevision}
+                </p>
+              </div>
 
-            return (
-              <li key={conflict.id} className="sync-conflict-item">
-                <div className="sync-conflict-item-header">
-                  <p className="sync-conflict-title">{summary.title}</p>
-                  <p className="settings-text settings-text--muted">
-                    {entityLabel(conflict.entityType)} · cloud revision {conflict.cloudRevision}
-                  </p>
+              <div className="sync-conflict-versions">
+                <div className="sync-conflict-version">
+                  <p className="sync-conflict-version-label">This device</p>
+                  <p className="settings-text">{summary.localSummary || '—'}</p>
                 </div>
-
-                <div className="sync-conflict-versions">
-                  <div className="sync-conflict-version">
-                    <p className="sync-conflict-version-label">This device</p>
-                    <p className="settings-text">{summary.localSummary || '—'}</p>
-                  </div>
-                  <div className="sync-conflict-version">
-                    <p className="sync-conflict-version-label">Cloud</p>
-                    <p className="settings-text">{summary.cloudSummary || '—'}</p>
-                  </div>
+                <div className="sync-conflict-version">
+                  <p className="sync-conflict-version-label">Cloud</p>
+                  <p className="settings-text">{summary.cloudSummary || '—'}</p>
                 </div>
+              </div>
 
-                <div className="account-actions">
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={busy}
-                    onClick={() => handleResolve(conflict, 'local')}
-                  >
-                    Keep local
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--secondary btn--sm"
-                    disabled={busy}
-                    onClick={() => handleResolve(conflict, 'cloud')}
-                  >
-                    Keep cloud
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </div>
-    </section>
+              <div className="account-actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={busy}
+                  onClick={() => handleResolve(conflict, 'local')}
+                >
+                  Keep local
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  disabled={busy}
+                  onClick={() => handleResolve(conflict, 'cloud')}
+                >
+                  Keep cloud
+                </button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

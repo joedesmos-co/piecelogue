@@ -10,8 +10,6 @@ import {
   Shapes,
 } from 'lucide-react'
 import AccountSection from '../components/AccountSection'
-import CloudRestoreSection from '../components/CloudRestoreSection'
-import CloudConflictSection from '../components/CloudConflictSection'
 import CloudSaveSection from '../components/CloudSaveSection'
 import AccountDataControlsSection from '../components/AccountDataControlsSection'
 import { useAuth } from '../hooks/useAuth'
@@ -85,14 +83,6 @@ export default function ProfilePage() {
       </header>
 
       <AccountSection />
-
-      <CloudRestoreSection authenticated={authenticated} />
-
-      <CloudConflictSection authenticated={authenticated} />
-
-      <CloudSaveSection authenticated={authenticated} />
-
-      <AccountDataControlsSection authenticated={authenticated} />
 
       <section className="settings-section">
         <h3 className="settings-section-title">
@@ -189,6 +179,10 @@ export default function ProfilePage() {
           </div>
         ) : null}
       </section>
+
+      <CloudSaveSection authenticated={authenticated} />
+
+      <AccountDataControlsSection authenticated={authenticated} />
     </div>
   )
 }

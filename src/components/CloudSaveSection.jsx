@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { Cloud, LoaderCircle, RefreshCw } from 'lucide-react'
 import { fetchCloudStatus } from '../api/cloud'
 import { useAuth } from '../hooks/useAuth'
+import { useRestore } from '../hooks/useRestore'
 import { useSync } from '../hooks/useSync'
 import { saveLibraryToCloud } from '../utils/cloudSave'
 import { formatUserError } from '../utils/userErrors'
 import { wakeSyncProcessor } from '../sync/processor'
+import { CloudConflictPanel } from './CloudConflictSection'
 
 function formatTimestamp(value) {
   if (!value) return null
@@ -69,6 +71,7 @@ function getStatusDetails(status, forcing) {
 export default function CloudSaveSection({ authenticated }) {
   const { user } = useAuth()
   const { status, retryNow } = useSync()
+  const { restoreState, promptVisible, restoreNow, keepDevice } = useRestore()
   const [cloudStatus, setCloudStatus] = useState(null)
   const [statusLoading, setStatusLoading] = useState(false)
   const [statusError, setStatusError] = useState('')
@@ -77,6 +80,21 @@ export default function CloudSaveSection({ authenticated }) {
   const [forceError, setForceError] = useState('')
   const [progress, setProgress] = useState(null)
   const [forceResult, setForceResult] = useState(null)
+
+  const { phase: restorePhase, progress: restoreProgress, result: restoreResult, error: restoreError } =
+    restoreState
+  const isRestoring = restorePhase === 'restoring'
+  const isRestoreChecking = restorePhase === 'checking'
+  const showRestoreActiveState =
+    promptVisible ||
+    isRestoreChecking ||
+    isRestoring ||
+    restorePhase === 'done' ||
+    restorePhase === 'error'
+  const restoreProgressPercent =
+    restoreProgress?.total > 0
+      ? Math.round((restoreProgress.current / restoreProgress.total) * 100)
+      : null
 
   useEffect(() => {
     if (!authenticated) {
@@ -109,7 +127,7 @@ export default function CloudSaveSection({ authenticated }) {
     return () => {
       cancelled = true
     }
-  }, [authenticated, forceResult, status.lastSyncedAt])
+  }, [authenticated, forceResult, status.lastSyncedAt, restoreResult])
 
   async function handleForceSync() {
     setShowForceWarning(false)
@@ -205,6 +223,8 @@ export default function CloudSaveSection({ authenticated }) {
           </button>
         ) : null}
 
+        <CloudConflictPanel />
+
         {statusLoading ? (
           <p className="settings-text settings-text--muted" role="status">
             <LoaderCircle size={14} className="cloud-save-spinner" aria-hidden="true" /> Checking
@@ -226,41 +246,139 @@ export default function CloudSaveSection({ authenticated }) {
           </div>
         ) : null}
 
-        {showForceWarning ? (
-          <div className="cloud-save-warning" role="note">
-            <p className="settings-text">
-              Force full sync uploads this device&apos;s entire library to your account and clears
-              pending auto-sync jobs. Use this if auto-sync gets stuck.
+        <div className="cloud-sync-restore">
+          <p className="settings-text settings-text--muted">
+            Download your cloud library to this device. If this device already has artwork, you will
+            be asked before anything is replaced.
+          </p>
+
+          {isRestoreChecking ? (
+            <p className="settings-text settings-text--muted" role="status" aria-live="polite">
+              <LoaderCircle size={14} className="cloud-save-spinner" aria-hidden="true" /> Checking
+              cloud library...
             </p>
-            <div className="account-actions">
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={handleForceSync}
-                disabled={forcing}
-              >
-                Force full sync
-              </button>
-              <button
-                type="button"
-                className="btn btn--secondary btn--sm"
-                onClick={() => setShowForceWarning(false)}
-                disabled={forcing}
-              >
-                Cancel
-              </button>
+          ) : null}
+
+          {promptVisible ? (
+            <div className="cloud-save-warning" role="note">
+              <p className="settings-text">
+                Cloud library found. Restore from cloud? This may add or replace local items on this
+                device.
+              </p>
+              <div className="account-actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={restoreNow}
+                  disabled={isRestoring}
+                >
+                  Restore from cloud
+                </button>
+                <button type="button" className="btn btn--secondary btn--sm" onClick={keepDevice}>
+                  Keep this device
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => setShowForceWarning(true)}
-            disabled={forcing}
-          >
-            Force full sync
-          </button>
-        )}
+          ) : !showRestoreActiveState ? (
+            <button
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={restoreNow}
+              disabled={isRestoring || isRestoreChecking}
+              aria-busy={isRestoring || isRestoreChecking}
+            >
+              Restore from cloud
+            </button>
+          ) : null}
+
+          {isRestoring && restoreProgress ? (
+            <div className="cloud-save-progress" aria-live="polite" role="status">
+              <div className="cloud-save-progress-header">
+                <LoaderCircle size={16} className="cloud-save-spinner" aria-hidden="true" />
+                <span>{restoreProgress.message}</span>
+              </div>
+              {restoreProgressPercent !== null ? (
+                <div
+                  className="cloud-save-progress-bar"
+                  role="progressbar"
+                  aria-valuenow={restoreProgressPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="cloud-save-progress-fill"
+                    style={{ width: `${restoreProgressPercent}%` }}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {restorePhase === 'done' && restoreResult ? (
+            <div className="cloud-save-success" role="status">
+              Restored {restoreResult.folderCount} folders and {restoreResult.artworkCount} artworks
+              from cloud.
+              {restoreResult.failedImageCount > 0
+                ? ` ${restoreResult.failedImageCount} image download${restoreResult.failedImageCount === 1 ? '' : 's'} failed — metadata was restored, but some images are missing.`
+                : ''}
+            </div>
+          ) : null}
+
+          {restorePhase === 'done' && restoreResult?.failedImageCount > 0 ? (
+            <button type="button" className="btn btn--secondary btn--sm" onClick={restoreNow}>
+              Retry restore
+            </button>
+          ) : null}
+
+          {restorePhase === 'error' ? (
+            <>
+              <div className="form-error" role="alert">
+                {restoreError}
+              </div>
+              <button type="button" className="btn btn--secondary btn--sm" onClick={restoreNow}>
+                Retry restore
+              </button>
+            </>
+          ) : null}
+        </div>
+
+        <div className="cloud-sync-actions">
+          {showForceWarning ? (
+            <div className="cloud-save-warning" role="note">
+              <p className="settings-text">
+                Force full sync uploads this device&apos;s entire library to your account and clears
+                pending auto-sync jobs. Use this if auto-sync gets stuck.
+              </p>
+              <div className="account-actions">
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={handleForceSync}
+                  disabled={forcing}
+                >
+                  Force full sync
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => setShowForceWarning(false)}
+                  disabled={forcing}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => setShowForceWarning(true)}
+              disabled={forcing}
+            >
+              Force full sync
+            </button>
+          )}
+        </div>
 
         {forcing && progress ? (
           <div className="cloud-save-progress" aria-live="polite">
