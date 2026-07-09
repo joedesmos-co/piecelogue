@@ -36,6 +36,10 @@
   // Production secrets:
   // npx wrangler secret put GOOGLE_CLIENT_ID
   // npx wrangler secret put GOOGLE_CLIENT_SECRET
+  // npx wrangler secret put APPLE_CLIENT_ID
+  // npx wrangler secret put APPLE_TEAM_ID
+  // npx wrangler secret put APPLE_KEY_ID
+  // npx wrangler secret put APPLE_PRIVATE_KEY
   //
   // Optional future magic-link email:
   // npx wrangler secret put AUTH_FROM_EMAIL

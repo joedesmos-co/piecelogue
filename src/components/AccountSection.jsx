@@ -13,9 +13,14 @@ import SignInDialog from './SignInDialog'
 import UsernameDialog from './UsernameDialog'
 
 const GOOGLE_SIGN_IN_URL = '/api/auth/google/start'
+const APPLE_SIGN_IN_URL = '/api/auth/apple/start'
 
 function startGoogleSignIn() {
   window.location.href = GOOGLE_SIGN_IN_URL
+}
+
+function startAppleSignIn() {
+  window.location.href = APPLE_SIGN_IN_URL
 }
 
 function formatHandle(username) {
@@ -178,26 +183,38 @@ export default function AccountSection() {
               <div className="account-sign-in-options">
                 <button
                   type="button"
-                  className="btn btn--primary account-google-btn"
+                  className="btn btn--primary account-oauth-btn account-apple-btn"
+                  onClick={startAppleSignIn}
+                  aria-label="Continue with Apple"
+                >
+                  Continue with Apple
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary account-oauth-btn account-google-btn"
                   onClick={startGoogleSignIn}
                   aria-label="Continue with Google"
                 >
                   Continue with Google
                 </button>
-                <button
-                  type="button"
-                  className="btn btn--secondary btn--sm"
-                  onClick={() => setShowEmailSignIn(true)}
-                >
-                  Use email instead
-                </button>
+                {import.meta.env.DEV ? (
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => setShowEmailSignIn(true)}
+                  >
+                    Development email login
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : null}
         </div>
       </section>
 
-      <SignInDialog isOpen={showEmailSignIn} onClose={() => setShowEmailSignIn(false)} />
+      {import.meta.env.DEV ? (
+        <SignInDialog isOpen={showEmailSignIn} onClose={() => setShowEmailSignIn(false)} />
+      ) : null}
       <UsernameDialog
         isOpen={showUsernameDialog}
         onClose={() => setShowUsernameDialog(false)}

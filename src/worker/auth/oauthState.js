@@ -39,15 +39,37 @@ export function getOAuthStateFromRequest(request, env) {
   return null
 }
 
-export function buildOAuthStateCookie(state, request, env) {
+export function buildOAuthStateValue(state, nonce = null) {
+  return nonce ? `${state}.${nonce}` : state
+}
+
+export function parseOAuthStateValue(value) {
+  if (!value) {
+    return { state: null, nonce: null }
+  }
+
+  const dotIndex = value.indexOf('.')
+  if (dotIndex === -1) {
+    return { state: value, nonce: null }
+  }
+
+  return {
+    state: value.slice(0, dotIndex),
+    nonce: value.slice(dotIndex + 1) || null,
+  }
+}
+
+export function buildOAuthStateCookie(state, request, env, options = {}) {
+  const { sameSite = 'Lax', nonce = null } = options
   const cookieName = getOAuthStateCookieName(env)
-  const secure = isProduction(env) ? true : isSecureRequest(request)
+  const secure =
+    sameSite === 'None' ? true : isProduction(env) ? true : isSecureRequest(request)
   const parts = [
-    `${cookieName}=${encodeURIComponent(state)}`,
+    `${cookieName}=${encodeURIComponent(buildOAuthStateValue(state, nonce))}`,
     'Path=/',
     'HttpOnly',
     `Max-Age=${OAUTH_STATE_MAX_AGE_SECONDS}`,
-    'SameSite=Lax',
+    `SameSite=${sameSite}`,
   ]
 
   if (secure) {
@@ -57,15 +79,17 @@ export function buildOAuthStateCookie(state, request, env) {
   return parts.join('; ')
 }
 
-export function buildClearOAuthStateCookie(request, env) {
+export function buildClearOAuthStateCookie(request, env, options = {}) {
+  const { sameSite = 'Lax' } = options
   const cookieName = getOAuthStateCookieName(env)
-  const secure = isProduction(env) ? true : isSecureRequest(request)
+  const secure =
+    sameSite === 'None' ? true : isProduction(env) ? true : isSecureRequest(request)
   const parts = [
     `${cookieName}=`,
     'Path=/',
     'HttpOnly',
     'Max-Age=0',
-    'SameSite=Lax',
+    `SameSite=${sameSite}`,
   ]
 
   if (secure) {
@@ -102,5 +126,19 @@ export function validateOAuthState(request, env, callbackState) {
     return false
   }
 
-  return constantTimeEqual(cookieState, callbackState)
+  const { state: storedState } = parseOAuthStateValue(cookieState)
+  if (!storedState) {
+    return false
+  }
+
+  return constantTimeEqual(storedState, callbackState)
+}
+
+export function getOAuthNonceFromRequest(request, env) {
+  const cookieState = getOAuthStateFromRequest(request, env)
+  if (!cookieState) {
+    return null
+  }
+
+  return parseOAuthStateValue(cookieState).nonce
 }

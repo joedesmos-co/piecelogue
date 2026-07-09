@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   buildOAuthStateCookie,
+  buildOAuthStateValue,
   constantTimeEqual,
   createOAuthState,
+  getOAuthNonceFromRequest,
+  parseOAuthStateValue,
   validateOAuthState,
 } from './oauthState.js'
 
@@ -51,5 +54,24 @@ describe('oauthState', () => {
     assert.match(cookie, /SameSite=Lax/)
     assert.match(cookie, /Max-Age=600/)
     assert.doesNotMatch(cookie, /Secure/)
+  })
+
+  it('stores nonce alongside state for Apple OAuth', () => {
+    const cookie = buildOAuthStateCookie('state-token', makeRequest(null), developmentEnv, {
+      sameSite: 'None',
+      nonce: 'nonce-token',
+    })
+
+    assert.equal(buildOAuthStateValue('state-token', 'nonce-token'), 'state-token.nonce-token')
+    assert.deepEqual(parseOAuthStateValue('state-token.nonce-token'), {
+      state: 'state-token',
+      nonce: 'nonce-token',
+    })
+    assert.match(cookie, /SameSite=None/)
+    assert.match(cookie, /state-token\.nonce-token/)
+
+    const request = makeRequest(`piecelogue_oauth_state_dev=${encodeURIComponent('state-token.nonce-token')}`)
+    assert.equal(validateOAuthState(request, developmentEnv, 'state-token'), true)
+    assert.equal(getOAuthNonceFromRequest(request, developmentEnv), 'nonce-token')
   })
 })

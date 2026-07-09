@@ -57,6 +57,25 @@ export async function findOrCreateVerifiedUser(db, email) {
   return createVerifiedUser(db, email)
 }
 
+export async function updateUserDisplayNameIfEmpty(db, userId, displayName) {
+  const trimmed = displayName?.trim()
+  if (!trimmed) {
+    return
+  }
+
+  const timestamp = nowIso()
+
+  await db
+    .prepare(
+      `UPDATE users
+       SET display_name = ?, updated_at = ?
+       WHERE id = ?
+         AND (display_name IS NULL OR TRIM(display_name) = '')`,
+    )
+    .bind(trimmed, timestamp, userId)
+    .run()
+}
+
 export async function createSession(db, userId) {
   const rawToken = generateSecureToken()
   const tokenHash = await hashToken(rawToken)

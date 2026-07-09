@@ -15,6 +15,7 @@ import {
   revokeSessionForToken,
 } from '../auth/sessions.js'
 import { sendMagicLinkEmail, isDevMode, buildMagicLinkUrl } from '../email/sendMagicLinkEmail.js'
+import { handleAppleCallback, handleAppleStart } from './appleAuth.js'
 import { handleGoogleCallback, handleGoogleStart } from './googleAuth.js'
 import { jsonError, jsonOk, methodNotAllowed } from '../http.js'
 
@@ -273,6 +274,10 @@ export async function handleAuthRoute(request, env, path) {
       return handleGoogleStart(request, env)
     case '/api/auth/google/callback':
       return handleGoogleCallback(request, env)
+    case '/api/auth/apple/start':
+      return handleAppleStart(request, env)
+    case '/api/auth/apple/callback':
+      return handleAppleCallback(request, env)
     default:
       return null
   }
