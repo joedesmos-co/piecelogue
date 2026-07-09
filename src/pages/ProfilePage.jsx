@@ -129,16 +129,40 @@ export default function ProfilePage() {
         {shouldLoadStats && !loading && stats && stats.totalArtworks > 0 ? (
           <div className="stats-grid">
             <StatCard
-              icon={Folder}
-              label="Folders"
-              value={folders.length}
-              accent="primary"
+              icon={Clock}
+              label="Total lifetime time"
+              value={formatTime(stats.totalMinutes)}
+              accent="time"
             />
             <StatCard
               icon={BarChart3}
               label="Total artworks"
               value={stats.totalArtworks}
               accent="primary"
+            />
+            <StatCard
+              icon={Folder}
+              label="Total folders"
+              value={folders.length}
+              accent="primary"
+            />
+            <StatCard
+              icon={Paintbrush}
+              label="Traditional art time"
+              value={formatTime(stats.traditionalMinutes)}
+              accent="traditional"
+            />
+            <StatCard
+              icon={Monitor}
+              label="Digital art time"
+              value={formatTime(stats.digitalMinutes)}
+              accent="digital"
+            />
+            <StatCard
+              icon={Shapes}
+              label="Other art time"
+              value={formatTime(stats.otherMinutes)}
+              accent="other"
             />
             <StatCard
               icon={CheckCircle}
@@ -151,30 +175,6 @@ export default function ProfilePage() {
               label="In progress"
               value={stats.inProgress}
               accent="warning"
-            />
-            <StatCard
-              icon={Clock}
-              label="Total lifetime time"
-              value={formatTime(stats.totalMinutes)}
-              accent="time"
-            />
-            <StatCard
-              icon={Monitor}
-              label="Digital art time"
-              value={formatTime(stats.digitalMinutes)}
-              accent="digital"
-            />
-            <StatCard
-              icon={Paintbrush}
-              label="Traditional art time"
-              value={formatTime(stats.traditionalMinutes)}
-              accent="traditional"
-            />
-            <StatCard
-              icon={Shapes}
-              label="Other art time"
-              value={formatTime(stats.otherMinutes)}
-              accent="other"
             />
           </div>
         ) : null}
