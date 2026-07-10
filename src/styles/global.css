@@ -45,6 +45,9 @@
 
   --sidebar-width: 240px;
   --bottom-nav-height: 64px;
+  --mobile-nav-height: var(--bottom-nav-height);
+  --mobile-fab-size: 52px;
+  --mobile-fab-gap: 16px;
   --mobile-header-height: 56px;
   --content-max-width: 1200px;
 
@@ -153,7 +156,10 @@ img {
   flex-direction: column;
   min-width: 0;
   min-height: 100dvh;
-  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(
+    var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + var(--mobile-fab-size) +
+      var(--mobile-fab-gap) + 16px
+  );
 }
 
 .app-content {
@@ -281,15 +287,15 @@ img {
   border-radius: var(--radius-sm);
 }
 
-.bottom-nav-add {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 52px;
-  height: 52px;
+.mobile-add-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + var(--mobile-fab-gap));
+  z-index: 90;
+  width: var(--mobile-fab-size);
+  height: var(--mobile-fab-size);
   border-radius: var(--radius-full);
-  border: 3px solid var(--bg-elevated);
+  border: none;
   background: var(--accent);
   color: var(--accent-text);
   display: flex;
@@ -299,17 +305,36 @@ img {
   transition: background 0.15s, transform 0.1s;
 }
 
-.bottom-nav-add:hover {
+.mobile-add-fab:hover {
   background: var(--accent-hover);
 }
 
-.bottom-nav-add:active {
-  transform: translateX(-50%) scale(0.95);
+.mobile-add-fab:active {
+  transform: scale(0.95);
 }
 
-.bottom-nav-add:focus-visible {
+.mobile-add-fab:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+body:has(.modal-overlay, .action-sheet-root) .mobile-add-fab {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .mobile-add-fab {
+    right: max(16px, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
+  }
+
+  .app-main {
+    padding-bottom: calc(
+      var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + var(--mobile-fab-size) + 8px +
+        12px
+    );
+  }
 }
 
 /* Desktop layout */
@@ -323,6 +348,10 @@ img {
   }
 
   .bottom-nav {
+    display: none;
+  }
+
+  .mobile-add-fab {
     display: none;
   }
 

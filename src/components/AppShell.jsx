@@ -47,8 +47,16 @@ export default function AppShell({
         <BottomNav
           currentPage={currentPage}
           onNavigate={onNavigate}
-          onAdd={onAdd}
         />
+
+        <button
+          type="button"
+          className="mobile-add-fab"
+          onClick={onAdd}
+          aria-label="Add artwork"
+        >
+          <Plus size={26} strokeWidth={2.5} />
+        </button>
       </div>
     </div>
   )

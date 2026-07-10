@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { id: PAGES.SETTINGS, label: 'Settings', icon: Settings },
 ]
 
-export function BottomNav({ currentPage, onNavigate, onAdd }) {
+export function BottomNav({ currentPage, onNavigate }) {
   return (
     <nav className="bottom-nav" aria-label="Main navigation">
       {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
@@ -23,14 +23,6 @@ export function BottomNav({ currentPage, onNavigate, onAdd }) {
           <span>{label}</span>
         </button>
       ))}
-      <button
-        type="button"
-        className="bottom-nav-add"
-        onClick={onAdd}
-        aria-label="Add artwork"
-      >
-        <Plus size={26} strokeWidth={2.5} />
-      </button>
     </nav>
   )
 }
