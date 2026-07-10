@@ -1,15 +1,22 @@
 import { apiFetch } from '../utils/api'
 import { ApiError } from '../utils/api'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
+import { IMAGE_UPLOAD_TIMEOUT_MS, METADATA_UPLOAD_TIMEOUT_MS } from '../sync/constants'
 
-async function uploadBinary(path, blob, contentType) {
-  const response = await fetch(path, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: {
-      'Content-Type': contentType,
+async function uploadBinary(path, blob, contentType, signal) {
+  const response = await fetchWithTimeout(
+    path,
+    {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': contentType,
+      },
+      body: blob,
+      signal,
     },
-    body: blob,
-  })
+    IMAGE_UPLOAD_TIMEOUT_MS,
+  )
 
   let data = null
   const responseContentType = response.headers.get('Content-Type') || ''
@@ -41,9 +48,10 @@ export async function fetchCloudLibrary() {
 }
 
 export async function downloadCloudArtworkImage(artworkId, imageType) {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `/api/cloud/artworks/${encodeURIComponent(artworkId)}/${imageType}`,
     { credentials: 'include' },
+    IMAGE_UPLOAD_TIMEOUT_MS,
   )
 
   if (!response.ok) {
@@ -59,38 +67,68 @@ export async function downloadCloudArtworkImage(artworkId, imageType) {
   return response.blob()
 }
 
-export async function deleteCloudFolder(folderId) {
-  return apiFetch(`/api/cloud/folders/${encodeURIComponent(folderId)}`, {
-    method: 'DELETE',
-  })
+export async function deleteCloudFolder(folderId, options = {}) {
+  return apiFetch(
+    `/api/cloud/folders/${encodeURIComponent(folderId)}`,
+    {
+      method: 'DELETE',
+      signal: options.signal,
+    },
+    METADATA_UPLOAD_TIMEOUT_MS,
+  )
 }
 
-export async function deleteCloudArtwork(artworkId) {
-  return apiFetch(`/api/cloud/artworks/${encodeURIComponent(artworkId)}`, {
-    method: 'DELETE',
-  })
+export async function deleteCloudArtwork(artworkId, options = {}) {
+  return apiFetch(
+    `/api/cloud/artworks/${encodeURIComponent(artworkId)}`,
+    {
+      method: 'DELETE',
+      signal: options.signal,
+    },
+    METADATA_UPLOAD_TIMEOUT_MS,
+  )
 }
 
-export async function uploadCloudFolders(folders) {
-  return apiFetch('/api/cloud/folders', {
-    method: 'PUT',
-    body: JSON.stringify({ folders }),
-  })
+export async function uploadCloudFolders(folders, options = {}) {
+  return apiFetch(
+    '/api/cloud/folders',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ folders }),
+      signal: options.signal,
+    },
+    METADATA_UPLOAD_TIMEOUT_MS,
+  )
 }
 
-export async function uploadCloudArtworks(artworks) {
-  return apiFetch('/api/cloud/artworks', {
-    method: 'PUT',
-    body: JSON.stringify({ artworks }),
-  })
+export async function uploadCloudArtworks(artworks, options = {}) {
+  return apiFetch(
+    '/api/cloud/artworks',
+    {
+      method: 'PUT',
+      body: JSON.stringify({ artworks }),
+      signal: options.signal,
+    },
+    METADATA_UPLOAD_TIMEOUT_MS,
+  )
 }
 
-export async function uploadCloudArtworkOriginal(artworkId, blob) {
-  const contentType = blob.type || 'image/jpeg'
-  return uploadBinary(`/api/cloud/artworks/${encodeURIComponent(artworkId)}/original`, blob, contentType)
+export async function uploadCloudArtworkOriginal(artworkId, blob, options = {}) {
+  const contentType = options.contentType || blob.type || 'image/jpeg'
+  return uploadBinary(
+    `/api/cloud/artworks/${encodeURIComponent(artworkId)}/original`,
+    blob,
+    contentType,
+    options.signal,
+  )
 }
 
-export async function uploadCloudArtworkThumbnail(artworkId, blob) {
-  const contentType = blob.type || 'image/jpeg'
-  return uploadBinary(`/api/cloud/artworks/${encodeURIComponent(artworkId)}/thumbnail`, blob, contentType)
+export async function uploadCloudArtworkThumbnail(artworkId, blob, options = {}) {
+  const contentType = options.contentType || blob.type || 'image/jpeg'
+  return uploadBinary(
+    `/api/cloud/artworks/${encodeURIComponent(artworkId)}/thumbnail`,
+    blob,
+    contentType,
+    options.signal,
+  )
 }

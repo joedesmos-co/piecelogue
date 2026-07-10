@@ -7,6 +7,10 @@ describe('formatUserError', () => {
   it('maps known API error codes to friendly messages', () => {
     assert.equal(
       formatUserError(new ApiError('Sign in required.', 'unauthorized', 401)),
+      'Sign-in expired. Please sign in again.',
+    )
+    assert.equal(
+      formatUserError(new ApiError('Sign in required.', 'unauthorized', 403)),
       'Please sign in to continue.',
     )
     assert.equal(

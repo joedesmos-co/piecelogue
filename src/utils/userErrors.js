@@ -2,12 +2,19 @@ import { ApiError } from './api.js'
 
 const ERROR_MESSAGES = {
   unauthorized: 'Please sign in to continue.',
+  sign_in_expired: 'Sign-in expired. Please sign in again.',
+  timeout: 'Timed out — retry when your connection is stable.',
+  cancelled: 'Sync cancelled.',
+  sync_in_progress: 'Sync is already running.',
+  unsupported_format: 'Unsupported image format. Use JPEG, PNG, WebP, or GIF.',
+  empty_blob: 'Image file is empty and cannot be uploaded.',
+  invalid_content_type: 'Unsupported image format. Use JPEG, PNG, WebP, or GIF.',
   service_unavailable: 'Cloud service is temporarily unavailable. Your changes are saved locally.',
   not_found: 'That item could not be found.',
   invalid_folder: 'Folder data could not be saved. Please try again.',
   invalid_artwork: 'Artwork data could not be saved. Please try again.',
   invalid_image: 'Image upload failed. Check the file and try again.',
-  payload_too_large: 'File is too large to upload.',
+  payload_too_large: 'Image is too large to upload.',
   upload_failed: 'Image upload failed. Please try again.',
   rate_limit: 'Too many requests. Please wait a moment and try again.',
   too_many_requests: 'Too many requests. Please wait a moment and try again.',
@@ -45,6 +52,10 @@ export function formatUserError(error, fallback = 'Something went wrong. Please 
       return ERROR_MESSAGES.offline
     }
     return ERROR_MESSAGES.network
+  }
+
+  if (error instanceof ApiError && error.status === 401) {
+    return ERROR_MESSAGES.sign_in_expired
   }
 
   if (error instanceof ApiError && error.code && ERROR_MESSAGES[error.code]) {

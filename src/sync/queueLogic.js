@@ -21,6 +21,7 @@ export function buildCoalescedJob(existingJob, { userId, entityType, entityId, n
     attempts: 0,
     lastError: null,
     nextRetryAt: null,
+    processingStartedAt: null,
     updatedAt: now,
   }
 
@@ -48,7 +49,7 @@ export function sortSyncJobs(jobs) {
 }
 
 export function isJobReady(job, now = Date.now()) {
-  if (job.status === 'failed' || job.status === 'conflict') {
+  if (job.status === 'failed' || job.status === 'conflict' || job.status === 'processing') {
     return false
   }
   if (!job.nextRetryAt) {

@@ -7,8 +7,16 @@ export function classifySyncError(error) {
     return { retryable: true, permanent: false }
   }
 
+  if (error.name === 'ImageUploadError') {
+    return { retryable: !error.permanent, permanent: Boolean(error.permanent) }
+  }
+
   if (error.name === 'TypeError' || error.message === 'Failed to fetch') {
     return { retryable: true, permanent: false }
+  }
+
+  if (error.code === 'timeout' || error.code === 'cancelled') {
+    return { retryable: error.code !== 'cancelled', permanent: false }
   }
 
   const status = error.status ?? null
@@ -47,13 +55,18 @@ export function shouldRetryJob(job, classification) {
 export function buildRetryUpdate(job, error, now = new Date()) {
   const classification = classifySyncError(error)
   const attempts = (job.attempts ?? 0) + 1
+  const errorMessage =
+    typeof error?.toDiagnosticString === 'function'
+      ? error.toDiagnosticString()
+      : error?.message || 'Sync failed.'
 
   if (!shouldRetryJob({ ...job, attempts }, classification)) {
     return {
       status: 'failed',
       attempts,
-      lastError: error?.message || 'Sync failed.',
+      lastError: errorMessage,
       nextRetryAt: null,
+      processingStartedAt: null,
       updatedAt: now.toISOString(),
     }
   }
@@ -62,8 +75,9 @@ export function buildRetryUpdate(job, error, now = new Date()) {
   return {
     status: 'pending',
     attempts,
-    lastError: error?.message || 'Sync failed.',
+    lastError: errorMessage,
     nextRetryAt: new Date(now.getTime() + delayMs).toISOString(),
+    processingStartedAt: null,
     updatedAt: now.toISOString(),
   }
 }

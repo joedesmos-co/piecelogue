@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from './fetchWithTimeout.js'
+
 export class ApiError extends Error {
   constructor(message, code = null, status = null) {
     super(message)
@@ -7,18 +9,22 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch(path, options = {}) {
+export async function apiFetch(path, options = {}, timeoutMs = 20_000) {
   const headers = { ...options.headers }
 
   if (options.body && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json'
   }
 
-  const response = await fetch(path, {
-    credentials: 'include',
-    ...options,
-    headers,
-  })
+  const response = await fetchWithTimeout(
+    path,
+    {
+      credentials: 'include',
+      ...options,
+      headers,
+    },
+    timeoutMs,
+  )
 
   let data = null
   const contentType = response.headers.get('Content-Type') || ''

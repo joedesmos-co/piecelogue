@@ -36,8 +36,16 @@ import {
   SYNC_JOB_STATUS,
 } from './constants'
 import { hashBlob, shouldUploadImage } from './imageHash'
+import { prepareBlobForUpload } from './imageUpload'
 import { filterJobsForActiveUser, isJobReady, sortSyncJobs } from './queueLogic'
 import { buildRetryUpdate } from './retry'
+import { recoverStuckProcessingJobs, scheduleRetryWake } from './retryScheduler'
+import {
+  isForceSyncActive,
+  releaseArtworkUpload,
+  shouldPauseBackgroundProcessor,
+  tryAcquireArtworkUpload,
+} from './syncLock'
 import { summarizeSyncFailures } from './statusDetails'
 import { getFullImageBlob, getGalleryImageBlob } from '../utils/imageUtils'
 
@@ -45,6 +53,7 @@ let processorRunning = false
 let processorAbort = false
 let wakeProcessor = null
 let statusListener = null
+let activeUploadDetail = null
 
 export function setSyncStatusListener(listener) {
   statusListener = listener
@@ -60,6 +69,14 @@ function isOnline() {
 
 export function wakeSyncProcessor() {
   wakeProcessor?.()
+}
+
+export function getActiveUploadDetail() {
+  return activeUploadDetail
+}
+
+function setActiveUploadDetail(detail) {
+  activeUploadDetail = detail
 }
 
 async function processFolderDeleteJob(job) {
@@ -85,6 +102,7 @@ async function markMetadataConflict(job, entityType, localRecord, conflictEntry)
   await updateSyncJob(job.id, {
     status: SYNC_JOB_STATUS.CONFLICT,
     lastError: 'Sync conflict — review needed.',
+    processingStartedAt: null,
   })
   await publishStatus(job.userId)
 }
@@ -138,6 +156,34 @@ async function processArtworkJob(job) {
   return false
 }
 
+async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job) {
+  const uploadDetails = {
+    stage,
+    artworkTitle: artwork.title,
+    artworkId: artwork.id,
+  }
+
+  const prepared = await prepareBlobForUpload(blob, uploadDetails)
+  setActiveUploadDetail({
+    artworkId: artwork.id,
+    artworkTitle: artwork.title,
+    stage,
+  })
+  await publishStatus(job.userId)
+
+  if (stage === 'original') {
+    await uploadCloudArtworkOriginal(artwork.id, prepared.blob, {
+      contentType: prepared.mimeType,
+    })
+    return prepared.blob ? await hashBlob(prepared.blob) : storedHash
+  }
+
+  await uploadCloudArtworkThumbnail(artwork.id, prepared.blob, {
+    contentType: prepared.mimeType,
+  })
+  return prepared.blob ? await hashBlob(prepared.blob) : storedHash
+}
+
 async function processArtworkImageJob(job) {
   const artwork = await artworkService.getArtworkById(job.entityId)
   if (!artwork) {
@@ -156,13 +202,23 @@ async function processArtworkImageJob(job) {
   let uploadedThumbnailHash = stored?.thumbnailHash ?? null
 
   if (shouldUploadImage(originalHash, stored?.originalHash) && originalBlob) {
-    await uploadCloudArtworkOriginal(artwork.id, originalBlob)
-    uploadedOriginalHash = originalHash
+    uploadedOriginalHash = await uploadArtworkImageStage(
+      artwork,
+      'original',
+      originalBlob,
+      uploadedOriginalHash,
+      job,
+    )
   }
 
   if (shouldUploadImage(thumbnailHash, stored?.thumbnailHash) && thumbnailBlob) {
-    await uploadCloudArtworkThumbnail(artwork.id, thumbnailBlob)
-    uploadedThumbnailHash = thumbnailHash
+    uploadedThumbnailHash = await uploadArtworkImageStage(
+      artwork,
+      'thumbnail',
+      thumbnailBlob,
+      uploadedThumbnailHash,
+      job,
+    )
   }
 
   if (uploadedOriginalHash || uploadedThumbnailHash) {
@@ -197,7 +253,7 @@ async function runWithConcurrency(jobs, limit, handler) {
   const queue = [...jobs]
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
     while (queue.length > 0) {
-      if (processorAbort) {
+      if (processorAbort || shouldPauseBackgroundProcessor()) {
         return
       }
       const job = queue.shift()
@@ -230,9 +286,21 @@ async function processReadyJobs(userId) {
   const imageJobs = readyJobs.filter((job) => job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE)
 
   const handleJob = async (job) => {
-    if (processorAbort || !assertActiveUserScope(job.userId)) {
+    if (processorAbort || !assertActiveUserScope(job.userId) || shouldPauseBackgroundProcessor()) {
       return
     }
+
+    if (
+      job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE &&
+      !tryAcquireArtworkUpload(job.entityId, 'background')
+    ) {
+      return
+    }
+
+    await updateSyncJob(job.id, {
+      status: SYNC_JOB_STATUS.PROCESSING,
+      processingStartedAt: new Date().toISOString(),
+    })
 
     try {
       const conflicted = await processJob(job)
@@ -247,26 +315,31 @@ async function processReadyJobs(userId) {
         await publishStatus(job.userId)
       }
       throw error
+    } finally {
+      if (job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE) {
+        setActiveUploadDetail(null)
+        releaseArtworkUpload(job.entityId)
+      }
     }
   }
 
   for (const job of deleteJobs) {
-    if (processorAbort) return
+    if (processorAbort || shouldPauseBackgroundProcessor()) return
     await handleJob(job).catch(() => {})
   }
 
   for (const job of folderJobs) {
-    if (processorAbort) return
+    if (processorAbort || shouldPauseBackgroundProcessor()) return
     await handleJob(job).catch(() => {})
   }
 
   for (const job of artworkJobs) {
-    if (processorAbort) return
+    if (processorAbort || shouldPauseBackgroundProcessor()) return
     await handleJob(job).catch(() => {})
   }
 
   await runWithConcurrency(imageJobs, MAX_IMAGE_UPLOAD_CONCURRENCY, async (job) => {
-    if (processorAbort) return
+    if (processorAbort || shouldPauseBackgroundProcessor()) return
     await handleJob(job).catch(() => {})
   })
 
@@ -294,12 +367,15 @@ async function buildStatus(userId) {
       lastSyncedAt: null,
       error: null,
       failures: [],
+      activeUpload: null,
+      forceSyncActive: false,
     }
   }
 
   const jobs = await getSyncJobsForUser(userId)
   const conflicts = await getSyncConflictsForUser(userId)
   const pendingJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.PENDING)
+  const processingJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.PROCESSING)
   const failedJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.FAILED)
   const conflictJobs = jobs.filter((job) => job.status === SYNC_JOB_STATUS.CONFLICT)
   const conflictCount = Math.max(conflictJobs.length, conflicts.length)
@@ -309,64 +385,90 @@ async function buildStatus(userId) {
 
   const pendingDeleteCount = countPendingDeleteJobs(jobs)
   const failures = summarizeSyncFailures(jobs)
+  const forceSyncActive = isForceSyncActive()
+  const activeUpload = activeUploadDetail
+
+  if (forceSyncActive) {
+    return {
+      state: 'syncing',
+      pendingCount: pendingJobs.length + processingJobs.length,
+      pendingDeleteCount,
+      conflictCount: 0,
+      lastSyncedAt: state?.lastSyncedAt ?? null,
+      error: null,
+      failures: [],
+      activeUpload,
+      forceSyncActive: true,
+    }
+  }
 
   if (!isOnline()) {
     return {
       state: conflictCount > 0 ? 'conflict' : 'offline',
-      pendingCount: pendingJobs.length + failedJobs.length,
+      pendingCount: pendingJobs.length + failedJobs.length + processingJobs.length,
       pendingDeleteCount,
       conflictCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? null,
       failures,
+      activeUpload,
+      forceSyncActive: false,
     }
   }
 
   if (conflictCount > 0) {
     return {
       state: 'conflict',
-      pendingCount: pendingJobs.length + failedJobs.length + conflictJobs.length,
+      pendingCount: pendingJobs.length + failedJobs.length + conflictJobs.length + processingJobs.length,
       pendingDeleteCount,
       conflictCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
       failures,
+      activeUpload,
+      forceSyncActive: false,
     }
   }
 
   if (failedJobs.length > 0) {
     return {
       state: 'error',
-      pendingCount: pendingJobs.length + failedJobs.length,
+      pendingCount: pendingJobs.length + failedJobs.length + processingJobs.length,
       pendingDeleteCount,
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? 'Sync failed.',
       failures,
+      activeUpload,
+      forceSyncActive: false,
     }
   }
 
-  if (processorRunning && readyCount > 0) {
+  if (processorRunning && (readyCount > 0 || processingJobs.length > 0 || activeUpload)) {
     return {
       state: 'syncing',
-      pendingCount: pendingJobs.length,
+      pendingCount: pendingJobs.length + processingJobs.length,
       pendingDeleteCount,
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
       failures: [],
+      activeUpload,
+      forceSyncActive: false,
     }
   }
 
-  if (pendingJobs.length > 0) {
+  if (pendingJobs.length > 0 || processingJobs.length > 0) {
     return {
-      state: waitingRetryCount > 0 && readyCount === 0 ? 'waiting' : 'pending',
-      pendingCount: pendingJobs.length,
+      state: waitingRetryCount > 0 && readyCount === 0 && processingJobs.length === 0 ? 'waiting' : 'pending',
+      pendingCount: pendingJobs.length + processingJobs.length,
       pendingDeleteCount,
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
-      error: null,
+      error: pendingJobs.find((job) => job.lastError)?.lastError ?? null,
       failures: [],
+      activeUpload,
+      forceSyncActive: false,
     }
   }
 
@@ -378,10 +480,14 @@ async function buildStatus(userId) {
     lastSyncedAt: state?.lastSyncedAt ?? null,
     error: null,
     failures: [],
+    activeUpload: null,
+    forceSyncActive: false,
   }
 }
 
 async function publishStatus(userId) {
+  const jobs = userId ? await getSyncJobsForUser(userId) : []
+  scheduleRetryWake(jobs, wakeSyncProcessor)
   emitStatus(await buildStatus(userId))
 }
 
@@ -412,6 +518,7 @@ export function stopSyncProcessor() {
   processorAbort = true
   processorRunning = false
   wakeProcessor = null
+  setActiveUploadDetail(null)
 }
 
 export function startSyncProcessor(userId) {
@@ -433,6 +540,14 @@ export function startSyncProcessor(userId) {
           break
         }
 
+        if (shouldPauseBackgroundProcessor()) {
+          await publishStatus(userId)
+          await new Promise((resolve) => {
+            wakeProcessor = resolve
+          })
+          continue
+        }
+
         if (!isOnline()) {
           await publishStatus(userId)
           await new Promise((resolve) => {
@@ -446,6 +561,7 @@ export function startSyncProcessor(userId) {
         await publishStatus(userId)
 
         const jobs = await getSyncJobsForUser(userId)
+        scheduleRetryWake(jobs, wakeSyncProcessor)
         const hasReadyWork = jobs.some(
           (job) =>
             job.userId === userId &&
@@ -462,11 +578,13 @@ export function startSyncProcessor(userId) {
       }
     } finally {
       processorRunning = false
+      setActiveUploadDetail(null)
     }
   }
 
   run().catch(() => {
     processorRunning = false
+    setActiveUploadDetail(null)
   })
 
   return () => {
@@ -479,6 +597,10 @@ export async function refreshSyncStatus(userId) {
   const status = await buildStatus(userId)
   emitStatus(status)
   return status
+}
+
+export async function recoverSyncJobs(userId) {
+  return recoverStuckProcessingJobs(userId)
 }
 
 export async function recordForceSyncComplete(userId, artworks) {
@@ -500,3 +622,5 @@ export async function recordForceSyncComplete(userId, artworks) {
     }
   }
 }
+
+export { isForceSyncActive }

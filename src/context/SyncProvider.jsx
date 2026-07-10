@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { setActiveSyncUserId } from '../sync/activeUser'
 import { setSyncWakeHandler } from '../sync/enqueue'
 import {
+  recoverSyncJobs,
   refreshSyncStatus,
   retryFailedSync,
   seedInitialLibrarySync,
@@ -11,6 +12,7 @@ import {
   stopSyncProcessor,
   wakeSyncProcessor,
 } from '../sync/processor'
+import { clearRetryScheduler } from '../sync/retryScheduler'
 import { SyncContext } from './syncContext'
 
 const INITIAL_STATUS = {
@@ -21,6 +23,8 @@ const INITIAL_STATUS = {
   lastSyncedAt: null,
   error: null,
   failures: [],
+  activeUpload: null,
+  forceSyncActive: false,
 }
 
 export function SyncProvider({ children }) {
@@ -37,6 +41,7 @@ export function SyncProvider({ children }) {
     return () => {
       setSyncStatusListener(null)
       setSyncWakeHandler(null)
+      clearRetryScheduler()
     }
   }, [])
 
@@ -59,6 +64,10 @@ export function SyncProvider({ children }) {
       if (cancelled) {
         return
       }
+      await recoverSyncJobs(userId)
+      if (cancelled) {
+        return
+      }
       wakeSyncProcessor()
       await refreshSyncStatus(userId)
     }
@@ -71,6 +80,7 @@ export function SyncProvider({ children }) {
       setActiveSyncUserId(null)
       stop()
       stopSyncProcessor()
+      clearRetryScheduler()
     }
   }, [authenticated, authLoading, userId])
 
@@ -79,9 +89,10 @@ export function SyncProvider({ children }) {
       return undefined
     }
 
-    function resumeSync() {
+    async function resumeSync() {
+      await recoverSyncJobs(userId)
       wakeSyncProcessor()
-      refreshSyncStatus(userId)
+      await refreshSyncStatus(userId)
     }
 
     function handleOnline() {

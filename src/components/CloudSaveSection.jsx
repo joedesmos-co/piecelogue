@@ -7,6 +7,8 @@ import { useSync } from '../hooks/useSync'
 import { saveLibraryToCloud } from '../utils/cloudSave'
 import { formatUserError } from '../utils/userErrors'
 import { wakeSyncProcessor } from '../sync/processor'
+import { describeImageUploadStage } from '../sync/imageUpload'
+import { cancelForceSync } from '../sync/syncLock'
 import { CloudConflictPanel } from './CloudConflictSection'
 import { describeSyncJobStageLabel } from '../sync/statusDetails'
 
@@ -19,11 +21,25 @@ function formatTimestamp(value) {
   return date.toLocaleString()
 }
 
-function getStatusDetails(status, forcing) {
+function getStatusDetails(status, forcing, progress) {
   const deleteNote =
     status.pendingDeleteCount > 0
       ? `${status.pendingDeleteCount} delete${status.pendingDeleteCount === 1 ? '' : 's'} waiting to sync.`
       : null
+
+  if (forcing && progress?.message) {
+    return {
+      label: progress.message,
+      description: progress.artworkTitle || deleteNote || 'Uploading your library to the cloud.',
+    }
+  }
+
+  if (status.activeUpload) {
+    return {
+      label: describeImageUploadStage(status.activeUpload.stage),
+      description: status.activeUpload.artworkTitle || deleteNote || 'Uploading your latest changes.',
+    }
+  }
 
   switch (status.state) {
     case 'up-to-date':
@@ -33,7 +49,7 @@ function getStatusDetails(status, forcing) {
       }
     case 'syncing':
       return {
-        label: forcing ? 'Force syncing...' : 'Syncing...',
+        label: status.forceSyncActive ? 'Force syncing...' : 'Syncing...',
         description: deleteNote || 'Uploading your latest changes.',
       }
     case 'pending':
@@ -44,7 +60,11 @@ function getStatusDetails(status, forcing) {
     case 'waiting':
       return {
         label: 'Waiting to retry sync',
-        description: deleteNote || `${status.pendingCount} change${status.pendingCount === 1 ? '' : 's'} will retry soon.`,
+        description:
+          deleteNote ||
+          (status.error
+            ? status.error
+            : `${status.pendingCount} change${status.pendingCount === 1 ? '' : 's'} will retry soon.`),
       }
     case 'offline':
       return {
@@ -152,10 +172,20 @@ export default function CloudSaveSection({ authenticated }) {
       setCloudStatus(remoteStatus)
       wakeSyncProcessor()
     } catch (err) {
-      setForceError(formatUserError(err, 'Force sync failed. Your local library is unchanged.'))
+      if (err?.code !== 'cancelled') {
+        setForceError(formatUserError(err, 'Force sync failed. Your local library is unchanged.'))
+      }
     } finally {
       setForcing(false)
+      setProgress(null)
     }
+  }
+
+  function handleCancelForceSync() {
+    cancelForceSync()
+    setForcing(false)
+    setProgress(null)
+    setForceError('')
   }
 
   if (!authenticated) {
@@ -174,11 +204,14 @@ export default function CloudSaveSection({ authenticated }) {
     )
   }
 
-  const statusDetails = getStatusDetails(status, forcing)
+  const statusDetails = getStatusDetails(status, forcing, progress)
   const lastSyncedAt = formatTimestamp(status.lastSyncedAt || cloudStatus?.lastSavedAt)
   const progressPercent =
     progress?.total > 0 ? Math.round((progress.current / progress.total) * 100) : null
-  const isBusy = status.state === 'syncing' || forcing
+  const isBusy =
+    status.state === 'syncing' || forcing || isRestoring || isRestoreChecking
+  const canForceSync =
+    !forcing && !isRestoring && !isRestoreChecking && status.state !== 'syncing'
 
   return (
     <section className="settings-section" aria-labelledby="cloud-sync-heading">
@@ -369,7 +402,7 @@ export default function CloudSaveSection({ authenticated }) {
                   type="button"
                   className="btn btn--primary btn--sm"
                   onClick={handleForceSync}
-                  disabled={forcing}
+                  disabled={!canForceSync}
                 >
                   Force full sync
                 </button>
@@ -388,7 +421,7 @@ export default function CloudSaveSection({ authenticated }) {
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() => setShowForceWarning(true)}
-              disabled={forcing}
+              disabled={!canForceSync}
             >
               Force full sync
             </button>
@@ -415,6 +448,9 @@ export default function CloudSaveSection({ authenticated }) {
                 <div className="cloud-save-progress-fill" style={{ width: `${progressPercent}%` }} />
               </div>
             ) : null}
+            <button type="button" className="btn btn--secondary btn--sm" onClick={handleCancelForceSync}>
+              Cancel sync
+            </button>
           </div>
         ) : null}
 

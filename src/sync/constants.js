@@ -16,9 +16,12 @@ export const SYNC_PRIORITIES = {
 
 export const SYNC_JOB_STATUS = {
   PENDING: 'pending',
+  PROCESSING: 'processing',
   FAILED: 'failed',
   CONFLICT: 'conflict',
 }
 
 export const MAX_IMAGE_UPLOAD_CONCURRENCY = 2
 export const MAX_SYNC_ATTEMPTS = 5
+export const METADATA_UPLOAD_TIMEOUT_MS = 20_000
+export const IMAGE_UPLOAD_TIMEOUT_MS = 90_000
