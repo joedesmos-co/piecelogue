@@ -704,6 +704,16 @@ a.btn--public:hover,
   cursor: pointer;
   transition: box-shadow 0.2s, transform 0.15s;
   text-align: left;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.artwork-card--dragging {
+  opacity: 0.55;
+  transform: scale(0.98);
+  box-shadow: var(--shadow-md);
+  z-index: 2;
 }
 
 .artwork-card:hover {
@@ -777,13 +787,29 @@ a.btn--public:hover,
   padding: 12px;
 }
 
+.artwork-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .artwork-card-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.artwork-card-menu-btn {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
 }
 
 .artwork-card-meta {
@@ -2703,5 +2729,146 @@ a.btn--public:hover,
 .not-found-actions .btn {
   min-height: 44px;
   justify-content: center;
+}
+
+/* ── Mobile gallery + touch interactions ── */
+
+.folder-card--drop-target {
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.folder-card--drop-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.sync-failure-details {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+
+.sync-failure-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.sync-failure-item + .sync-failure-item {
+  margin-top: 6px;
+}
+
+.action-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.action-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.action-sheet {
+  position: relative;
+  width: min(100%, 480px);
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--shadow-lg);
+}
+
+.action-sheet-handle {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+}
+
+.action-sheet-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.action-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-sheet-btn {
+  min-height: 48px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-heading);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.action-sheet-btn--danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+
+@media (max-width: 640px) {
+  .page {
+    overflow-x: hidden;
+  }
+
+  .gallery-header,
+  .gallery-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .gallery-toolbar .btn {
+    min-height: 44px;
+  }
+
+  .artwork-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .folder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .icon-btn,
+  .folder-card-menu-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 641px) {
+  .action-sheet-root {
+    align-items: center;
+  }
+
+  .action-sheet {
+    border-radius: var(--radius-lg);
+    margin: 24px;
+  }
 }
 

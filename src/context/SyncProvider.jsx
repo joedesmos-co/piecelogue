@@ -20,6 +20,7 @@ const INITIAL_STATUS = {
   conflictCount: 0,
   lastSyncedAt: null,
   error: null,
+  failures: [],
 }
 
 export function SyncProvider({ children }) {
@@ -78,21 +79,37 @@ export function SyncProvider({ children }) {
       return undefined
     }
 
-    function handleOnline() {
+    function resumeSync() {
       wakeSyncProcessor()
       refreshSyncStatus(userId)
+    }
+
+    function handleOnline() {
+      resumeSync()
     }
 
     function handleOffline() {
       refreshSyncStatus(userId)
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        resumeSync()
+      }
+    }
+
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    window.addEventListener('pageshow', resumeSync)
+    window.addEventListener('focus', resumeSync)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('pageshow', resumeSync)
+      window.removeEventListener('focus', resumeSync)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [userId])
 

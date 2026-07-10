@@ -100,9 +100,20 @@ export function ArtworkProvider({ children }) {
     return folder
   }, [refresh])
 
+  const moveArtworkToFolder = useCallback(async (id, folderId) => {
+    const artwork = await artworkService.moveArtworkToFolder(id, folderId)
+    await enqueueArtworkMetadataSync(id)
+    await refresh()
+    return artwork
+  }, [refresh])
+
   const removeFolder = useCallback(async (id, options) => {
+    const movedArtworks = await artworkService.getArtworksByFolderId(id)
     const folder = await folderService.deleteFolder(id, options)
     await enqueueFolderDeleteSync(id)
+    for (const artwork of movedArtworks) {
+      await enqueueArtworkMetadataSync(artwork.id)
+    }
     await refresh()
     return folder
   }, [refresh])
@@ -117,6 +128,7 @@ export function ArtworkProvider({ children }) {
     editArtwork,
     removeArtwork,
     toggleFavorite,
+    moveArtworkToFolder,
     createFolder,
     updateFolder,
     removeFolder,

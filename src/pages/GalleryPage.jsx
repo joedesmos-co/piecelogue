@@ -20,6 +20,8 @@ import FolderNameDialog from '../components/FolderNameDialog'
 import GalleryBreadcrumbs from '../components/GalleryBreadcrumbs'
 import GalleryContextMenu from '../components/GalleryContextMenu'
 import LoadingState from '../components/LoadingState'
+import ArtworkActionsSheet from '../components/ArtworkActionsSheet'
+import MoveToFolderSheet from '../components/MoveToFolderSheet'
 
 export default function GalleryPage({ onAdd, onEdit }) {
   const { authenticated } = useAuth()
@@ -30,6 +32,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
     error,
     removeArtwork,
     toggleFavorite,
+    moveArtworkToFolder,
     createFolder,
     updateFolder,
     removeFolder,
@@ -45,6 +48,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const [deleteFolderTarget, setDeleteFolderTarget] = useState(null)
   const [deletingFolder, setDeletingFolder] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
+  const [actionArtwork, setActionArtwork] = useState(null)
+  const [moveTargetArtwork, setMoveTargetArtwork] = useState(null)
+  const [movingArtwork, setMovingArtwork] = useState(false)
+  const [dragArtworkId, setDragArtworkId] = useState(null)
+  const [dropFolderId, setDropFolderId] = useState(null)
 
   const unfiledArtworks = useMemo(
     () => artworks.filter((artwork) => !artwork.folderId),
@@ -132,6 +140,48 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
     event.preventDefault()
     setContextMenu({ x: event.clientX, y: event.clientY })
+  }
+
+  async function handleMoveArtworkToFolder(artwork, folderId) {
+    setMovingArtwork(true)
+    try {
+      await moveArtworkToFolder(artwork.id, folderId)
+      setMoveTargetArtwork(null)
+      setActionArtwork(null)
+    } finally {
+      setMovingArtwork(false)
+    }
+  }
+
+  function handleDragStart(artwork) {
+    setDragArtworkId(artwork.id)
+    setDropFolderId(null)
+  }
+
+  function handleDragMove(_artwork, event) {
+    const element = document.elementFromPoint(event.clientX, event.clientY)
+    const folderCard = element?.closest('[data-folder-id]')
+    const nextFolderId = folderCard?.getAttribute('data-folder-id') ?? null
+    setDropFolderId(nextFolderId)
+
+    const edge = 72
+    if (event.clientY < edge) {
+      window.scrollBy({ top: -10, behavior: 'auto' })
+    } else if (window.innerHeight - event.clientY < edge) {
+      window.scrollBy({ top: 10, behavior: 'auto' })
+    }
+  }
+
+  async function handleDragEnd(artwork, _event, meta = {}) {
+    const targetFolderId = dropFolderId
+    setDragArtworkId(null)
+    setDropFolderId(null)
+
+    if (meta.cancelled || !targetFolderId || targetFolderId === artwork.folderId) {
+      return
+    }
+
+    await handleMoveArtworkToFolder(artwork, targetFolderId)
   }
 
   async function handleToggleFavorite(artwork) {
@@ -326,6 +376,22 @@ export default function GalleryPage({ onAdd, onEdit }) {
                       onOpen={openFolder}
                       onRename={(item) => setFolderDialog({ mode: 'rename', folder: item })}
                       onDelete={setDeleteFolderTarget}
+                      onNewSubfolder={(item) =>
+                        setFolderDialog({ mode: 'create', parentFolderId: item.id })
+                      }
+                      onMoveFolder={(item) =>
+                        setFolderDialog({ mode: 'rename', folder: item })
+                      }
+                      isDropTarget={Boolean(dragArtworkId)}
+                      dropTargetActive={dropFolderId === folder.id}
+                      onDropArtwork={(folderId) => {
+                        const artwork = artworks.find((item) => item.id === dragArtworkId)
+                        if (artwork) {
+                          handleMoveArtworkToFolder(artwork, folderId)
+                        }
+                        setDragArtworkId(null)
+                        setDropFolderId(null)
+                      }}
                     />
                   ))}
                 </div>
@@ -400,6 +466,12 @@ export default function GalleryPage({ onAdd, onEdit }) {
                     artwork={artwork}
                     folders={folders}
                     onClick={setSelectedArtwork}
+                    onOpenActions={setActionArtwork}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    isDragging={Boolean(dragArtworkId)}
+                    isDragSource={dragArtworkId === artwork.id}
                   />
                 ))}
               </div>
@@ -447,6 +519,37 @@ export default function GalleryPage({ onAdd, onEdit }) {
         onNewFolder={() =>
           setFolderDialog({ mode: 'create', parentFolderId: currentFolderId })
         }
+      />
+
+      <ArtworkActionsSheet
+        isOpen={Boolean(actionArtwork)}
+        artwork={actionArtwork}
+        onClose={() => setActionArtwork(null)}
+        onMove={(artwork) => {
+          setActionArtwork(null)
+          setMoveTargetArtwork(artwork)
+        }}
+        onEdit={(artwork) => {
+          setActionArtwork(null)
+          onEdit(artwork)
+        }}
+        onToggleFavorite={async (artwork) => {
+          setActionArtwork(null)
+          await handleToggleFavorite(artwork)
+        }}
+        onDelete={(artwork) => {
+          setActionArtwork(null)
+          setDeleteTarget(artwork)
+        }}
+      />
+
+      <MoveToFolderSheet
+        isOpen={Boolean(moveTargetArtwork)}
+        artwork={moveTargetArtwork}
+        folders={folders}
+        onClose={() => setMoveTargetArtwork(null)}
+        onMove={handleMoveArtworkToFolder}
+        moving={movingArtwork}
       />
     </div>
   )

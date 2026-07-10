@@ -38,6 +38,7 @@ import {
 import { hashBlob, shouldUploadImage } from './imageHash'
 import { filterJobsForActiveUser, isJobReady, sortSyncJobs } from './queueLogic'
 import { buildRetryUpdate } from './retry'
+import { summarizeSyncFailures } from './statusDetails'
 import { getFullImageBlob, getGalleryImageBlob } from '../utils/imageUtils'
 
 let processorRunning = false
@@ -292,6 +293,7 @@ async function buildStatus(userId) {
       conflictCount: 0,
       lastSyncedAt: null,
       error: null,
+      failures: [],
     }
   }
 
@@ -306,6 +308,7 @@ async function buildStatus(userId) {
   const state = await getSyncState(userId)
 
   const pendingDeleteCount = countPendingDeleteJobs(jobs)
+  const failures = summarizeSyncFailures(jobs)
 
   if (!isOnline()) {
     return {
@@ -315,6 +318,7 @@ async function buildStatus(userId) {
       conflictCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? null,
+      failures,
     }
   }
 
@@ -326,6 +330,7 @@ async function buildStatus(userId) {
       conflictCount,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
+      failures,
     }
   }
 
@@ -337,6 +342,7 @@ async function buildStatus(userId) {
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: failedJobs[0]?.lastError ?? 'Sync failed.',
+      failures,
     }
   }
 
@@ -348,6 +354,7 @@ async function buildStatus(userId) {
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
+      failures: [],
     }
   }
 
@@ -359,6 +366,7 @@ async function buildStatus(userId) {
       conflictCount: 0,
       lastSyncedAt: state?.lastSyncedAt ?? null,
       error: null,
+      failures: [],
     }
   }
 
@@ -369,6 +377,7 @@ async function buildStatus(userId) {
     conflictCount: 0,
     lastSyncedAt: state?.lastSyncedAt ?? null,
     error: null,
+    failures: [],
   }
 }
 

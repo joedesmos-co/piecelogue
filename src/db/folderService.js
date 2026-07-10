@@ -5,6 +5,7 @@ import {
   normalizeParentFolderId,
   wouldCreateFolderCycle,
 } from '../utils/folderTree'
+import { buildMetadataOnlyArtworkRecord } from './artworkPreservationCore'
 
 function normalizeFolderName(name) {
   return (name || '').trim()
@@ -163,10 +164,12 @@ export async function deleteFolder(id, { moveContentsTo = 'root' } = {}) {
     const now = new Date().toISOString()
 
     for (const artwork of artworks) {
-      await db.artworks.update(artwork.id, {
-        folderId: targetFolderId,
-        updatedAt: now,
-      })
+      await db.artworks.put(
+        buildMetadataOnlyArtworkRecord(artwork, {
+          folderId: targetFolderId,
+          updatedAt: now,
+        }),
+      )
     }
 
     for (const childFolder of childFolders) {

@@ -27,10 +27,20 @@ export async function upsertRestoredFolders(folders) {
  */
 export async function upsertRestoredArtworkMetadata(metadata) {
   const existing = await db.artworks.get(metadata.id)
-  await db.artworks.put({ ...existing, ...metadata })
+  await db.artworks.put({
+    ...existing,
+    ...metadata,
+    image: metadata.image ?? existing?.image,
+    thumbnail: metadata.thumbnail ?? existing?.thumbnail,
+  })
 }
 
 export async function saveRestoredArtworkImage(artworkId, imageType, blob) {
+  const existing = await db.artworks.get(artworkId)
+  if (!existing) {
+    return
+  }
+
   const updates = imageType === 'thumbnail' ? { thumbnail: blob } : { image: blob }
-  await db.artworks.update(artworkId, updates)
+  await db.artworks.put({ ...existing, ...updates })
 }

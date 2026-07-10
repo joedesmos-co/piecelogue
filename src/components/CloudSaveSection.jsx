@@ -8,6 +8,7 @@ import { saveLibraryToCloud } from '../utils/cloudSave'
 import { formatUserError } from '../utils/userErrors'
 import { wakeSyncProcessor } from '../sync/processor'
 import { CloudConflictPanel } from './CloudConflictSection'
+import { describeSyncJobStageLabel } from '../sync/statusDetails'
 
 function formatTimestamp(value) {
   if (!value) return null
@@ -221,6 +222,20 @@ export default function CloudSaveSection({ authenticated }) {
             <RefreshCw size={14} aria-hidden="true" />
             Retry now
           </button>
+        ) : null}
+
+        {status.failures?.length > 0 ? (
+          <div className="sync-failure-details" role="status">
+            <p className="settings-text settings-text--muted">Sync issues by stage:</p>
+            <ul className="sync-failure-list">
+              {status.failures.map((failure) => (
+                <li key={failure.stage} className="sync-failure-item">
+                  <strong>{describeSyncJobStageLabel(failure.stage)}</strong>
+                  {failure.count > 1 ? ` (${failure.count} items)` : ''}: {failure.message}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         <CloudConflictPanel />

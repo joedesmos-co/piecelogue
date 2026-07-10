@@ -1,20 +1,58 @@
-import { Heart, Clock, Folder } from 'lucide-react'
+import { Heart, Clock, Folder, MoreHorizontal } from 'lucide-react'
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getGalleryImageBlobs } from '../utils/imageUtils'
 import { getFolderPathLabel } from '../utils/folderTree'
+import { useLongPress } from '../hooks/useLongPress'
 import ArtworkImage from './ArtworkImage'
 
-export default function ArtworkCard({ artwork, folders = [], onClick }) {
+export default function ArtworkCard({
+  artwork,
+  folders = [],
+  onClick,
+  onOpenActions,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  isDragging = false,
+  isDragSource = false,
+}) {
   const imageBlobs = getGalleryImageBlobs(artwork)
   const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
 
+  const { longPressHandlers } = useLongPress({
+    onPress: () => onClick?.(artwork),
+    onLongPress: () => onDragStart?.(artwork),
+    onLongPressMove: (event) => onDragMove?.(artwork, event),
+    onLongPressEnd: (event, meta) => {
+      if (meta.dragged) {
+        onDragEnd?.(artwork, event)
+      } else if (meta.showActions) {
+        onOpenActions?.(artwork)
+      } else {
+        onDragEnd?.(artwork, event, { cancelled: true })
+      }
+    },
+    disabled: isDragging && !isDragSource,
+  })
+
   return (
-    <button
-      type="button"
-      className="artwork-card"
-      onClick={() => onClick(artwork)}
-      aria-label={`View ${artwork.title}`}
+    <div
+      className={`artwork-card ${isDragSource ? 'artwork-card--dragging' : ''}`}
+      {...longPressHandlers}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick?.(artwork)
+        }
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault()
+          onOpenActions?.(artwork)
+        }
+      }}
+      aria-label={`View ${artwork.title}. Long-press or use the menu for more actions.`}
     >
       <div className="artwork-card-image-wrap">
         <ArtworkImage
@@ -32,7 +70,21 @@ export default function ArtworkCard({ artwork, folders = [], onClick }) {
         )}
       </div>
       <div className="artwork-card-body">
-        <h3 className="artwork-card-title">{artwork.title}</h3>
+        <div className="artwork-card-title-row">
+          <h3 className="artwork-card-title">{artwork.title}</h3>
+          <button
+            type="button"
+            className="icon-btn artwork-card-menu-btn"
+            aria-label={`Actions for ${artwork.title}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpenActions?.(artwork)
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
         <div className="artwork-card-meta">
           <span className="badge badge--medium-type">{resolveMediumType(artwork)}</span>
           {artwork.status && (
@@ -61,6 +113,6 @@ export default function ArtworkCard({ artwork, folders = [], onClick }) {
           )}
         </div>
       </div>
-    </button>
+    </div>
   )
 }

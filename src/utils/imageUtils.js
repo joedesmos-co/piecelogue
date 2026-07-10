@@ -7,13 +7,19 @@ export function isValidImageFile(file) {
 
 export function isValidImageBlob(value) {
   if (!value || typeof value !== 'object') return false
-  const size = typeof value.size === 'number' ? value.size : 0
-  if (size <= 0) return false
-  return (
+
+  const isBlobLike =
     value instanceof Blob ||
     value instanceof File ||
     Object.prototype.toString.call(value) === '[object Blob]'
-  )
+
+  if (!isBlobLike) return false
+
+  const size = typeof value.size === 'number' ? value.size : 0
+  // iOS Safari may report size 0 for valid IndexedDB blobs until they are read.
+  if (size > 0) return true
+
+  return isBlobLike
 }
 
 /**
@@ -52,11 +58,12 @@ export function coalesceArtworkBlobs(artwork) {
 export function getGalleryImageBlobs(artwork) {
   if (!artwork) return []
 
-  const record = coalesceArtworkBlobs(artwork)
   const blobs = []
+  const thumbnail = coalesceBlob(artwork.thumbnail)
+  const image = coalesceBlob(artwork.image)
 
-  if (record.thumbnail) blobs.push(record.thumbnail)
-  if (record.image && record.image !== record.thumbnail) blobs.push(record.image)
+  if (thumbnail) blobs.push(thumbnail)
+  if (image && image !== thumbnail) blobs.push(image)
 
   return blobs
 }
@@ -71,13 +78,12 @@ export function getGalleryImageBlob(artwork) {
 export function getFullImageBlobs(artwork) {
   if (!artwork) return []
 
-  const record = coalesceArtworkBlobs(artwork)
   const blobs = []
+  const image = coalesceBlob(artwork.image)
+  const thumbnail = coalesceBlob(artwork.thumbnail)
 
-  if (record.image) blobs.push(record.image)
-  if (record.thumbnail && record.thumbnail !== record.image) {
-    blobs.push(record.thumbnail)
-  }
+  if (image) blobs.push(image)
+  if (thumbnail && thumbnail !== image) blobs.push(thumbnail)
 
   return blobs
 }

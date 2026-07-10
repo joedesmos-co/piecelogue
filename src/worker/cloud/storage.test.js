@@ -74,6 +74,21 @@ describe('cloud library row mapping', () => {
   })
 })
 
+describe('cloud artwork metadata upsert', () => {
+  it('preserves R2 object keys on metadata-only SQL updates', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { fileURLToPath } = await import('node:url')
+    const { dirname, join } = await import('node:path')
+    const storagePath = join(dirname(fileURLToPath(import.meta.url)), 'storage.js')
+    const source = readFileSync(storagePath, 'utf8')
+    const updateMatch = source.match(/if \(existing\) \{[\s\S]*?UPDATE artworks[\s\S]*?WHERE id = \? AND user_id = \?/)
+
+    assert.ok(updateMatch, 'Expected artwork metadata UPDATE statement')
+    assert.doesNotMatch(updateMatch[0], /original_object_key\s*=/)
+    assert.doesNotMatch(updateMatch[0], /thumbnail_object_key\s*=/)
+  })
+})
+
 describe('cloud delete helpers', () => {
   it('collects artwork R2 object keys for cleanup', () => {
     assert.deepEqual(

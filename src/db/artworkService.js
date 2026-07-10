@@ -3,6 +3,7 @@ import { generateId } from '../utils/id'
 import { calculateTotalMinutes } from '../utils/formatTime'
 import { createThumbnail, coalesceArtworkBlobs } from '../utils/imageUtils'
 import { resolveMediumType, MEDIUM_TYPES } from '../utils/constants'
+import { buildMetadataOnlyArtworkRecord } from './artworkPreservationCore'
 
 function normalizeMediumType(value, fallbackArtwork) {
   if (value && MEDIUM_TYPES.includes(value)) return value
@@ -47,6 +48,25 @@ function normalizeArtworkRecord(artwork) {
   delete normalized.category
   delete normalized.collection
   return normalized
+}
+
+async function saveArtworkRecord(existing, scalarUpdates, imageBlob = null) {
+  const updatedAt = new Date().toISOString()
+  let record = buildMetadataOnlyArtworkRecord(existing, {
+    ...scalarUpdates,
+    updatedAt,
+  })
+
+  if (imageBlob) {
+    record = {
+      ...record,
+      image: imageBlob,
+      thumbnail: await createThumbnail(imageBlob),
+    }
+  }
+
+  await db.artworks.put(record)
+  return normalizeArtworkRecord(record)
 }
 
 export async function getAllArtworks() {
@@ -109,18 +129,18 @@ export async function updateArtwork(id, data, imageBlob = null) {
     throw new Error('A title is required.')
   }
 
-  const updates = {
-    ...normalized,
-    updatedAt: new Date().toISOString(),
+  return saveArtworkRecord(existing, normalized, imageBlob)
+}
+
+export async function moveArtworkToFolder(id, folderId) {
+  const existing = await db.artworks.get(id)
+  if (!existing) {
+    throw new Error('Artwork not found.')
   }
 
-  if (imageBlob) {
-    updates.image = imageBlob
-    updates.thumbnail = await createThumbnail(imageBlob)
-  }
-
-  await db.artworks.update(id, updates)
-  return normalizeArtworkRecord({ ...existing, ...updates })
+  return saveArtworkRecord(existing, {
+    folderId: normalizeFolderId(folderId),
+  })
 }
 
 export async function deleteArtwork(id) {
@@ -134,11 +154,7 @@ export async function toggleFavorite(id) {
   }
 
   const favorite = !artwork.favorite
-  await db.artworks.update(id, {
-    favorite,
-    updatedAt: new Date().toISOString(),
-  })
-  return normalizeArtworkRecord({ ...artwork, favorite })
+  return saveArtworkRecord(artwork, { favorite })
 }
 
 export async function getStats() {

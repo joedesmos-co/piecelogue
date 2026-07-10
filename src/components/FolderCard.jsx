@@ -1,15 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
 import ArtworkImage from './ArtworkImage'
+import { useLongPress } from '../hooks/useLongPress'
 
 export default function FolderCard({
   folder,
   onOpen,
   onRename,
   onDelete,
+  onNewSubfolder,
+  onMoveFolder,
+  isDropTarget = false,
+  dropTargetActive = false,
+  onDropArtwork,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+
+  const { longPressHandlers } = useLongPress({
+    onPress: () => onOpen(folder.id),
+    onLongPressEnd: (_event, meta) => {
+      if (meta.showActions) {
+        setMenuOpen(true)
+      }
+    },
+  })
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -33,11 +48,26 @@ export default function FolderCard({
   }, [menuOpen])
 
   return (
-    <article className="folder-card">
-      <button
-        type="button"
+    <article
+      className={`folder-card ${isDropTarget ? 'folder-card--drop-target' : ''} ${dropTargetActive ? 'folder-card--drop-active' : ''}`}
+      data-folder-id={folder.id}
+      onPointerUp={(event) => {
+        if (dropTargetActive) {
+          onDropArtwork?.(folder.id, event)
+        }
+      }}
+    >
+      <div
         className="folder-card-open"
-        onClick={() => onOpen(folder.id)}
+        {...longPressHandlers}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            onOpen(folder.id)
+          }
+        }}
         aria-label={`Open folder ${folder.name}, ${folder.count} artwork${folder.count !== 1 ? 's' : ''}`}
       >
         <div className="folder-card-previews" aria-hidden="true">
@@ -68,7 +98,7 @@ export default function FolderCard({
               : ''}
           </p>
         </div>
-      </button>
+      </div>
 
       <div className="folder-card-actions" ref={menuRef}>
         <button
@@ -90,10 +120,32 @@ export default function FolderCard({
               role="menuitem"
               onClick={() => {
                 setMenuOpen(false)
+                onNewSubfolder?.(folder)
+              }}
+            >
+              New subfolder
+            </button>
+            <button
+              type="button"
+              className="folder-menu-item"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false)
                 onRename(folder)
               }}
             >
               Rename
+            </button>
+            <button
+              type="button"
+              className="folder-menu-item"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false)
+                onMoveFolder?.(folder)
+              }}
+            >
+              Move folder
             </button>
             <button
               type="button"
