@@ -6,6 +6,7 @@ import {
   getThumbnailObjectKey,
   mapCloudArtworkRow,
   mapCloudFolderRow,
+  saveArtworkOriginal,
 } from './storage.js'
 
 describe('cloud storage keys', () => {
@@ -18,6 +19,54 @@ describe('cloud storage keys', () => {
       getThumbnailObjectKey('user-1', 'art-1'),
       'users/user-1/artworks/art-1/thumbnail.jpg',
     )
+  })
+})
+
+describe('cloud image storage completion', () => {
+  it('does not resolve success until the R2 put completes', async () => {
+    let resolvePut
+    let databaseUpdated = false
+    const bucket = {
+      put() {
+        return new Promise((resolve) => {
+          resolvePut = resolve
+        })
+      },
+    }
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return {
+              async run() {
+                databaseUpdated = true
+              },
+            }
+          },
+        }
+      },
+    }
+
+    let completed = false
+    const savePromise = saveArtworkOriginal(
+      db,
+      bucket,
+      'user-1',
+      'art-1',
+      new Uint8Array([1, 2, 3]),
+      'image/jpeg',
+    ).then(() => {
+      completed = true
+    })
+
+    await Promise.resolve()
+    assert.equal(completed, false)
+    assert.equal(databaseUpdated, false)
+
+    resolvePut()
+    await savePromise
+    assert.equal(completed, true)
+    assert.equal(databaseUpdated, true)
   })
 })
 

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { describe, it, mock } from 'node:test'
+import { uploadCloudArtworkOriginal } from '../api/cloud.js'
 import { ApiError } from '../utils/api.js'
-import { fetchWithTimeout } from '../utils/fetchWithTimeout.js'
+import { fetchWithTimeout, runWithWatchdog } from '../utils/fetchWithTimeout.js'
 import {
   ImageUploadError,
   isHeicMimeType,
@@ -15,6 +16,7 @@ import {
   scheduleRetryWake,
   STUCK_PROCESSING_THRESHOLD_MS,
 } from './retryScheduler.js'
+import { getCloudSyncStatusDetails } from './cloudSyncStatus.js'
 import {
   cancelForceSync,
   isForceSyncActive,
@@ -61,17 +63,9 @@ describe('sync lock', () => {
 })
 
 describe('fetch timeouts', () => {
-  it('turns hung requests into retryable timeout errors', async () => {
+  it('turns hung requests into retryable timeout errors even when fetch ignores abort', async () => {
     const originalFetch = globalThis.fetch
-    globalThis.fetch = mock.fn(async (_url, options) => {
-      return new Promise((_resolve, reject) => {
-        options.signal?.addEventListener('abort', () => {
-          const abortError = new Error('Aborted')
-          abortError.name = 'AbortError'
-          reject(abortError)
-        })
-      })
-    })
+    globalThis.fetch = mock.fn(async () => new Promise(() => {}))
 
     try {
       await assert.rejects(
@@ -81,6 +75,42 @@ describe('fetch timeouts', () => {
     } finally {
       globalThis.fetch = originalFetch
     }
+  })
+
+  it('wires cancellation to the exact fetch signal', async () => {
+    const originalFetch = globalThis.fetch
+    const controller = new AbortController()
+    let fetchSignal = null
+    globalThis.fetch = mock.fn(async (_url, options) => {
+      fetchSignal = options.signal
+      return new Promise(() => {})
+    })
+
+    try {
+      const request = fetchWithTimeout('/api/cloud/artworks/test/original', {
+        signal: controller.signal,
+      }, 1000)
+      controller.abort()
+      await assert.rejects(
+        () => request,
+        (error) => error instanceof ApiError && error.code === 'cancelled',
+      )
+      assert.ok(fetchSignal)
+      assert.equal(fetchSignal.aborted, true)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('uses an outer watchdog so a stuck upload promise terminates', async () => {
+    await assert.rejects(
+      () =>
+        runWithWatchdog(() => new Promise(() => {}), {
+          timeoutMs: 20,
+          timeoutMessage: 'Upload watchdog timed out.',
+        }),
+      (error) => error instanceof ApiError && error.code === 'timeout',
+    )
   })
 })
 
@@ -100,7 +130,20 @@ describe('image upload validation', () => {
 
     const prepared = await prepareBlobForUpload(blob, { stage: 'thumbnail' })
     assert.equal(prepared.byteSize, 11)
+    assert.equal(prepared.blobSize, 0)
     assert.equal(prepared.mimeType, 'image/jpeg')
+    assert.ok(prepared.body instanceof Uint8Array)
+    assert.equal(new TextDecoder().decode(prepared.body), 'image-bytes')
+  })
+
+  it('creates an ArrayBuffer-backed upload body from every IndexedDB blob', async () => {
+    const blob = new Blob(['jpeg-data'], { type: 'image/jpeg' })
+    const prepared = await prepareBlobForUpload(blob, { stage: 'original' })
+
+    assert.ok(prepared.body instanceof Uint8Array)
+    assert.equal(prepared.byteSize, 9)
+    assert.equal(prepared.blobSize, 9)
+    assert.equal(prepared.format, 'JPEG')
   })
 
   it('rejects HEIC and other unsupported MIME types', async () => {
@@ -116,6 +159,24 @@ describe('image upload validation', () => {
     assert.equal(isSupportedUploadMime('image/heic'), false)
   })
 
+  it('detects HEIC bytes even when the Blob MIME type is missing', async () => {
+    const heicBytes = new Uint8Array([
+      0, 0, 0, 24,
+      0x66, 0x74, 0x79, 0x70,
+      0x68, 0x65, 0x69, 0x63,
+      0, 0, 0, 0,
+    ])
+    const heic = new Blob([heicBytes])
+
+    await assert.rejects(
+      () => prepareBlobForUpload(heic, { stage: 'original' }),
+      (error) =>
+        error instanceof ImageUploadError &&
+        error.code === 'unsupported_format' &&
+        error.mimeType === 'image/heic',
+    )
+  })
+
   it('handles original success with thumbnail failure as a permanent image error', () => {
     const error = new ImageUploadError('Image file is empty.', 'empty_blob', {
       stage: 'thumbnail',
@@ -129,6 +190,39 @@ describe('image upload validation', () => {
     assert.equal(update.status, 'failed')
     assert.match(update.lastError, /Mario and Yoshi/)
     assert.match(update.lastError, /thumbnail/)
+  })
+})
+
+describe('image upload request identity', () => {
+  it('sends one ArrayBuffer-backed request per artwork stage with the request ID', async () => {
+    const originalFetch = globalThis.fetch
+    const calls = []
+    globalThis.fetch = mock.fn(async (url, options) => {
+      calls.push({ url, options })
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    })
+
+    try {
+      await uploadCloudArtworkOriginal('art-1', new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+        requestId: 'upl-test-request',
+        mimeType: 'image/jpeg',
+        format: 'JPEG',
+        blobSize: 3,
+        byteSize: 3,
+      })
+
+      assert.equal(calls.length, 1)
+      assert.match(calls[0].url, /art-1\/original$/)
+      assert.equal(calls[0].options.headers['X-Piecelogue-Upload-Id'], 'upl-test-request')
+      assert.ok(calls[0].options.body instanceof Uint8Array)
+      assert.ok(calls[0].options.signal instanceof AbortSignal)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
   })
 })
 
@@ -212,5 +306,26 @@ describe('retry classification', () => {
     const classification = classifySyncError(new ApiError('Timed out', 'timeout', 408))
     assert.equal(classification.retryable, true)
     assert.equal(classification.permanent, false)
+  })
+})
+
+describe('cloud sync progress copy', () => {
+  it('does not duplicate force-sync artwork and stage in the global banner', () => {
+    const details = getCloudSyncStatusDetails(
+      {
+        state: 'syncing',
+        pendingDeleteCount: 0,
+        activeUpload: {
+          stage: 'original',
+          artworkTitle: 'Mario and Yoshi',
+        },
+        forceSyncActive: true,
+      },
+      true,
+    )
+
+    assert.equal(details.label, 'Force sync in progress')
+    assert.equal(details.description, 'Detailed upload progress is shown below.')
+    assert.doesNotMatch(`${details.label} ${details.description}`, /Mario and Yoshi|original/i)
   })
 })

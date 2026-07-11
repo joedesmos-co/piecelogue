@@ -10,7 +10,12 @@ import {
 } from '../api/cloud'
 import { toCloudArtworkMetadata, toCloudFolder } from '../sync/cloudPayload'
 import { describeImageUploadStage, prepareBlobForUpload } from '../sync/imageUpload'
-import { recordForceSyncComplete, wakeSyncProcessor } from '../sync/processor'
+import {
+  recordForceSyncComplete,
+  waitForBackgroundProcessorIdle,
+  wakeSyncProcessor,
+} from '../sync/processor'
+import { createUploadRequestId } from '../sync/uploadDiagnostics'
 import {
   releaseArtworkUpload,
   releaseForceSyncLock,
@@ -47,6 +52,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
   wakeSyncProcessor()
 
   try {
+    await waitForBackgroundProcessorIdle(signal)
     const folders = await folderService.getAllFolders()
     const artworks = await artworkService.getAllArtworks()
     const imageSteps = buildImageUploadSteps(artworks)
@@ -122,6 +128,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
           artworkTitle: artwork.title,
           artworkId: artwork.id,
         })
+        const requestId = createUploadRequestId()
 
         onProgress?.({
           phase: 'images',
@@ -130,17 +137,27 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
           total: imageSteps.length,
           artworkTitle: artwork.title,
           stage: type,
+          requestId,
+          mimeType: prepared.mimeType,
+          format: prepared.format,
+          blobSize: prepared.blobSize,
+          byteSize: prepared.byteSize,
+          exceedsLimit: prepared.exceedsLimit,
         })
 
         if (type === 'original') {
-          await uploadCloudArtworkOriginal(artwork.id, prepared.blob, {
+          await uploadCloudArtworkOriginal(artwork.id, prepared.body, {
             contentType: prepared.mimeType,
             signal,
+            requestId,
+            ...prepared,
           })
         } else {
-          await uploadCloudArtworkThumbnail(artwork.id, prepared.blob, {
+          await uploadCloudArtworkThumbnail(artwork.id, prepared.body, {
             contentType: prepared.mimeType,
             signal,
+            requestId,
+            ...prepared,
           })
         }
       } finally {

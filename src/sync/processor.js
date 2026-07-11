@@ -37,6 +37,7 @@ import {
 } from './constants'
 import { hashBlob, shouldUploadImage } from './imageHash'
 import { prepareBlobForUpload } from './imageUpload'
+import { createUploadRequestId } from './uploadDiagnostics'
 import { filterJobsForActiveUser, isJobReady, sortSyncJobs } from './queueLogic'
 import { buildRetryUpdate } from './retry'
 import { recoverStuckProcessingJobs, scheduleRetryWake } from './retryScheduler'
@@ -54,6 +55,8 @@ let processorAbort = false
 let wakeProcessor = null
 let statusListener = null
 let activeUploadDetail = null
+let activeBackgroundJobCount = 0
+const backgroundIdleWaiters = new Set()
 
 export function setSyncStatusListener(listener) {
   statusListener = listener
@@ -73,6 +76,57 @@ export function wakeSyncProcessor() {
 
 export function getActiveUploadDetail() {
   return activeUploadDetail
+}
+
+function notifyBackgroundIdle() {
+  if (activeBackgroundJobCount !== 0) {
+    return
+  }
+  for (const resolve of backgroundIdleWaiters) {
+    resolve()
+  }
+  backgroundIdleWaiters.clear()
+}
+
+export function waitForBackgroundProcessorIdle(signal, timeoutMs = 95_000) {
+  if (activeBackgroundJobCount === 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    let timeoutId = null
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      signal?.removeEventListener('abort', handleAbort)
+      backgroundIdleWaiters.delete(handleIdle)
+    }
+    const handleIdle = () => {
+      cleanup()
+      resolve()
+    }
+    const handleAbort = () => {
+      cleanup()
+      const error = new Error('Sync cancelled.')
+      error.code = 'cancelled'
+      reject(error)
+    }
+
+    backgroundIdleWaiters.add(handleIdle)
+    if (signal?.aborted) {
+      handleAbort()
+      return
+    }
+    signal?.addEventListener('abort', handleAbort, { once: true })
+    timeoutId = setTimeout(() => {
+      cleanup()
+      const error = new Error('Background sync did not stop in time.')
+      error.code = 'timeout'
+      reject(error)
+    }, timeoutMs)
+  })
 }
 
 function setActiveUploadDetail(detail) {
@@ -164,24 +218,35 @@ async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job) {
   }
 
   const prepared = await prepareBlobForUpload(blob, uploadDetails)
+  const requestId = createUploadRequestId()
   setActiveUploadDetail({
     artworkId: artwork.id,
     artworkTitle: artwork.title,
     stage,
+    requestId,
+    mimeType: prepared.mimeType,
+    format: prepared.format,
+    blobSize: prepared.blobSize,
+    byteSize: prepared.byteSize,
+    exceedsLimit: prepared.exceedsLimit,
   })
   await publishStatus(job.userId)
 
   if (stage === 'original') {
-    await uploadCloudArtworkOriginal(artwork.id, prepared.blob, {
+    await uploadCloudArtworkOriginal(artwork.id, prepared.body, {
       contentType: prepared.mimeType,
+      requestId,
+      ...prepared,
     })
-    return prepared.blob ? await hashBlob(prepared.blob) : storedHash
+    return blob ? await hashBlob(blob) : storedHash
   }
 
-  await uploadCloudArtworkThumbnail(artwork.id, prepared.blob, {
+  await uploadCloudArtworkThumbnail(artwork.id, prepared.body, {
     contentType: prepared.mimeType,
+    requestId,
+    ...prepared,
   })
-  return prepared.blob ? await hashBlob(prepared.blob) : storedHash
+  return blob ? await hashBlob(blob) : storedHash
 }
 
 async function processArtworkImageJob(job) {
@@ -290,19 +355,24 @@ async function processReadyJobs(userId) {
       return
     }
 
-    if (
-      job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE &&
-      !tryAcquireArtworkUpload(job.entityId, 'background')
-    ) {
+    const isImageJob = job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE
+    if (isImageJob && !tryAcquireArtworkUpload(job.entityId, 'background')) {
       return
     }
 
-    await updateSyncJob(job.id, {
-      status: SYNC_JOB_STATUS.PROCESSING,
-      processingStartedAt: new Date().toISOString(),
-    })
+    if (processorAbort || shouldPauseBackgroundProcessor()) {
+      if (isImageJob) {
+        releaseArtworkUpload(job.entityId)
+      }
+      return
+    }
 
+    activeBackgroundJobCount += 1
     try {
+      await updateSyncJob(job.id, {
+        status: SYNC_JOB_STATUS.PROCESSING,
+        processingStartedAt: new Date().toISOString(),
+      })
       const conflicted = await processJob(job)
       if (conflicted) {
         return
@@ -316,10 +386,12 @@ async function processReadyJobs(userId) {
       }
       throw error
     } finally {
-      if (job.entityType === SYNC_ENTITY_TYPES.ARTWORK_IMAGE) {
+      if (isImageJob) {
         setActiveUploadDetail(null)
         releaseArtworkUpload(job.entityId)
       }
+      activeBackgroundJobCount = Math.max(0, activeBackgroundJobCount - 1)
+      notifyBackgroundIdle()
     }
   }
 

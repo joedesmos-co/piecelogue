@@ -1,4 +1,6 @@
 export const UPLOAD_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+export const MAX_ORIGINAL_UPLOAD_BYTES = 25 * 1024 * 1024
+export const MAX_THUMBNAIL_UPLOAD_BYTES = 2 * 1024 * 1024
 
 const HEIC_TYPES = new Set(['image/heic', 'image/heif'])
 
@@ -39,6 +41,76 @@ export function isSupportedUploadMime(mimeType) {
   return UPLOAD_ALLOWED_TYPES.includes(mimeType.split(';')[0].trim().toLowerCase())
 }
 
+export function describeImageFormat(mimeType) {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return 'JPEG'
+    case 'image/png':
+      return 'PNG'
+    case 'image/webp':
+      return 'WebP'
+    case 'image/gif':
+      return 'GIF'
+    case 'image/heic':
+      return 'HEIC'
+    case 'image/heif':
+      return 'HEIF'
+    default:
+      return 'unknown'
+  }
+}
+
+function readAscii(bytes, start, length) {
+  return String.fromCharCode(...bytes.slice(start, start + length))
+}
+
+export function detectImageFormat(bytes, declaredMimeType = '') {
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) {
+    return { format: 'JPEG', mimeType: 'image/jpeg' }
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    readAscii(bytes, 1, 3) === 'PNG'
+  ) {
+    return { format: 'PNG', mimeType: 'image/png' }
+  }
+
+  if (bytes.length >= 6 && ['GIF87a', 'GIF89a'].includes(readAscii(bytes, 0, 6))) {
+    return { format: 'GIF', mimeType: 'image/gif' }
+  }
+
+  if (
+    bytes.length >= 12 &&
+    readAscii(bytes, 0, 4) === 'RIFF' &&
+    readAscii(bytes, 8, 4) === 'WEBP'
+  ) {
+    return { format: 'WebP', mimeType: 'image/webp' }
+  }
+
+  if (bytes.length >= 12 && readAscii(bytes, 4, 4) === 'ftyp') {
+    const brand = readAscii(bytes, 8, 4).toLowerCase()
+    if (['heic', 'heix', 'hevc', 'hevx'].includes(brand)) {
+      return { format: 'HEIC', mimeType: 'image/heic' }
+    }
+    if (['heif', 'mif1', 'msf1'].includes(brand)) {
+      return { format: 'HEIF', mimeType: 'image/heif' }
+    }
+  }
+
+  const normalizedMimeType = declaredMimeType.split(';')[0].trim().toLowerCase()
+  return {
+    format: describeImageFormat(normalizedMimeType),
+    mimeType: normalizedMimeType || 'application/octet-stream',
+  }
+}
+
 export async function prepareBlobForUpload(blob, details = {}) {
   if (!blob || typeof blob !== 'object') {
     throw new ImageUploadError('Image file is missing.', 'missing_image', {
@@ -47,38 +119,39 @@ export async function prepareBlobForUpload(blob, details = {}) {
     })
   }
 
-  let resolved = blob
-  let byteSize = typeof blob.size === 'number' ? blob.size : 0
+  const blobSize = typeof blob.size === 'number' ? blob.size : null
+  let buffer
 
-  if (byteSize === 0) {
-    try {
-      const buffer = await blob.arrayBuffer()
-      byteSize = buffer.byteLength
-      if (byteSize === 0) {
-        throw new ImageUploadError('Image file is empty.', 'empty_blob', {
-          ...details,
-          mimeType: blob.type || null,
-          byteSize: 0,
-          permanent: true,
-        })
-      }
-      resolved = new Blob([buffer], { type: blob.type || 'image/jpeg' })
-    } catch (error) {
-      if (error instanceof ImageUploadError) {
-        throw error
-      }
-      throw new ImageUploadError('Could not read image file.', 'unreadable_blob', {
-        ...details,
-        permanent: true,
-      })
+  try {
+    buffer = await blob.arrayBuffer()
+  } catch (error) {
+    if (error instanceof ImageUploadError) {
+      throw error
     }
+    throw new ImageUploadError('Could not read image file.', 'unreadable_blob', {
+      ...details,
+      permanent: true,
+    })
   }
 
-  const mimeType = (resolved.type || 'image/jpeg').split(';')[0].trim().toLowerCase()
+  const byteSize = buffer.byteLength
+  if (byteSize === 0) {
+    throw new ImageUploadError('Image file is empty.', 'empty_blob', {
+      ...details,
+      mimeType: blob.type || null,
+      byteSize: 0,
+      permanent: true,
+    })
+  }
 
-  if (isHeicMimeType(mimeType)) {
+  const declaredMimeType = (blob.type || '').split(';')[0].trim().toLowerCase()
+  const detected = detectImageFormat(new Uint8Array(buffer), declaredMimeType)
+  const mimeType = detected.mimeType
+  const format = detected.format
+
+  if (isHeicMimeType(mimeType) || format === 'HEIC' || format === 'HEIF') {
     throw new ImageUploadError(
-      'Unsupported image format (HEIC). Re-add the artwork as JPEG or PNG.',
+      'This image format cannot be uploaded yet.',
       'unsupported_format',
       {
         ...details,
@@ -87,6 +160,17 @@ export async function prepareBlobForUpload(blob, details = {}) {
         permanent: true,
       },
     )
+  }
+
+  const maxBytes =
+    details.stage === 'thumbnail' ? MAX_THUMBNAIL_UPLOAD_BYTES : MAX_ORIGINAL_UPLOAD_BYTES
+  if (byteSize > maxBytes) {
+    throw new ImageUploadError('Image is too large to upload.', 'payload_too_large', {
+      ...details,
+      mimeType,
+      byteSize,
+      permanent: true,
+    })
   }
 
   if (!isSupportedUploadMime(mimeType)) {
@@ -102,7 +186,14 @@ export async function prepareBlobForUpload(blob, details = {}) {
     )
   }
 
-  return { blob: resolved, mimeType, byteSize }
+  return {
+    body: new Uint8Array(buffer),
+    mimeType,
+    format,
+    blobSize,
+    byteSize,
+    exceedsLimit: false,
+  }
 }
 
 export function describeImageUploadStage(stage) {

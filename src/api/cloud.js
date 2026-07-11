@@ -1,40 +1,95 @@
-import { apiFetch } from '../utils/api'
-import { ApiError } from '../utils/api'
-import { fetchWithTimeout } from '../utils/fetchWithTimeout'
-import { IMAGE_UPLOAD_TIMEOUT_MS, METADATA_UPLOAD_TIMEOUT_MS } from '../sync/constants'
+import { apiFetch } from '../utils/api.js'
+import { ApiError } from '../utils/api.js'
+import { fetchWithTimeout, runWithWatchdog } from '../utils/fetchWithTimeout.js'
+import { IMAGE_UPLOAD_TIMEOUT_MS, METADATA_UPLOAD_TIMEOUT_MS } from '../sync/constants.js'
+import {
+  buildSafeUploadDiagnostic,
+  createUploadRequestId,
+  logUploadEnd,
+  logUploadFailure,
+  logUploadStart,
+} from '../sync/uploadDiagnostics.js'
 
-async function uploadBinary(path, blob, contentType, signal) {
-  const response = await fetchWithTimeout(
-    path,
-    {
-      method: 'PUT',
-      credentials: 'include',
-      headers: {
-        'Content-Type': contentType,
+function combineSignals(primary, secondary) {
+  if (!primary) {
+    return secondary
+  }
+
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([primary, secondary])
+  }
+
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  if (primary.aborted || secondary.aborted) {
+    abort()
+  } else {
+    primary.addEventListener('abort', abort, { once: true })
+    secondary.addEventListener('abort', abort, { once: true })
+  }
+  return controller.signal
+}
+
+export async function uploadBinary(path, body, options = {}) {
+  const requestId = options.requestId || createUploadRequestId()
+  const diagnostic = buildSafeUploadDiagnostic({
+    ...options,
+    requestId,
+  })
+  const requestController = new AbortController()
+
+  logUploadStart(diagnostic)
+
+  try {
+    const data = await runWithWatchdog(
+      async () => {
+        const response = await fetchWithTimeout(
+          path,
+          {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {
+              'Content-Type': options.contentType,
+              'X-Piecelogue-Upload-Id': requestId,
+            },
+            body,
+            signal: combineSignals(options.signal, requestController.signal),
+          },
+          IMAGE_UPLOAD_TIMEOUT_MS,
+        )
+
+        let responseData = null
+        const responseContentType = response.headers.get('Content-Type') || ''
+        if (responseContentType.includes('application/json')) {
+          responseData = await response.json()
+        }
+
+        if (!response.ok) {
+          const message = responseData?.error?.message || `Request failed (${response.status})`
+          throw new ApiError(message, responseData?.error?.code, response.status)
+        }
+
+        if (responseData?.ok === false) {
+          const message = responseData?.error?.message || 'Request failed'
+          throw new ApiError(message, responseData?.error?.code, response.status)
+        }
+
+        return responseData
       },
-      body: blob,
-      signal,
-    },
-    IMAGE_UPLOAD_TIMEOUT_MS,
-  )
+      {
+        timeoutMs: IMAGE_UPLOAD_TIMEOUT_MS + 1000,
+        signal: options.signal,
+        timeoutMessage: 'Image upload watchdog timed out. Retry when your connection is stable.',
+      },
+    )
 
-  let data = null
-  const responseContentType = response.headers.get('Content-Type') || ''
-  if (responseContentType.includes('application/json')) {
-    data = await response.json()
+    logUploadEnd(diagnostic)
+    return data
+  } catch (error) {
+    requestController.abort()
+    logUploadFailure(diagnostic, error)
+    throw error
   }
-
-  if (!response.ok) {
-    const message = data?.error?.message || `Request failed (${response.status})`
-    throw new ApiError(message, data?.error?.code, response.status)
-  }
-
-  if (data?.ok === false) {
-    const message = data?.error?.message || 'Request failed'
-    throw new ApiError(message, data?.error?.code, response.status)
-  }
-
-  return data
 }
 
 export async function fetchCloudStatus() {
@@ -113,22 +168,26 @@ export async function uploadCloudArtworks(artworks, options = {}) {
   )
 }
 
-export async function uploadCloudArtworkOriginal(artworkId, blob, options = {}) {
-  const contentType = options.contentType || blob.type || 'image/jpeg'
+export async function uploadCloudArtworkOriginal(artworkId, body, options = {}) {
   return uploadBinary(
     `/api/cloud/artworks/${encodeURIComponent(artworkId)}/original`,
-    blob,
-    contentType,
-    options.signal,
+    body,
+    {
+      ...options,
+      artworkId,
+      stage: 'original',
+    },
   )
 }
 
-export async function uploadCloudArtworkThumbnail(artworkId, blob, options = {}) {
-  const contentType = options.contentType || blob.type || 'image/jpeg'
+export async function uploadCloudArtworkThumbnail(artworkId, body, options = {}) {
   return uploadBinary(
     `/api/cloud/artworks/${encodeURIComponent(artworkId)}/thumbnail`,
-    blob,
-    contentType,
-    options.signal,
+    body,
+    {
+      ...options,
+      artworkId,
+      stage: 'thumbnail',
+    },
   )
 }

@@ -437,12 +437,22 @@ export async function assertArtworkOwnedByUser(db, userId, artworkId) {
   return row
 }
 
-export async function saveArtworkOriginal(db, bucket, userId, artworkId, body, contentType) {
+export async function saveArtworkOriginal(
+  db,
+  bucket,
+  userId,
+  artworkId,
+  body,
+  contentType,
+  hooks = {},
+) {
   const objectKey = getOriginalObjectKey(userId, artworkId, contentType)
 
+  hooks.onStorageStart?.()
   await bucket.put(objectKey, body, {
     httpMetadata: { contentType },
   })
+  hooks.onStorageEnd?.()
 
   const updatedAt = nowIso()
   await db
@@ -457,12 +467,22 @@ export async function saveArtworkOriginal(db, bucket, userId, artworkId, body, c
   return { objectKey, updatedAt }
 }
 
-export async function saveArtworkThumbnail(db, bucket, userId, artworkId, body, contentType) {
+export async function saveArtworkThumbnail(
+  db,
+  bucket,
+  userId,
+  artworkId,
+  body,
+  contentType,
+  hooks = {},
+) {
   const objectKey = getThumbnailObjectKey(userId, artworkId)
 
+  hooks.onStorageStart?.()
   await bucket.put(objectKey, body, {
     httpMetadata: { contentType: contentType || 'image/jpeg' },
   })
+  hooks.onStorageEnd?.()
 
   const updatedAt = nowIso()
   await db

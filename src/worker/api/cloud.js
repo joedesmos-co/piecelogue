@@ -13,7 +13,7 @@ import {
   upsertCloudFolders,
 } from '../cloud/storage.js'
 import { requireAuthenticatedUser } from '../auth/requireUser.js'
-import { logError } from '../log.js'
+import { logError, logInfo } from '../log.js'
 import {
   buildUserRateLimitKey,
   checkRateLimit,
@@ -55,6 +55,56 @@ async function readJsonBody(request, maxBytes) {
   } catch {
     throw new InvalidJsonError()
   }
+}
+
+function getUploadRequestId(request) {
+  const value = request.headers.get('X-Piecelogue-Upload-Id')?.trim()
+  if (!value || !/^[a-zA-Z0-9_-]{1,100}$/.test(value)) {
+    return 'missing'
+  }
+  return value
+}
+
+export async function readImageBodyWithLimit(request, maxBytes) {
+  const contentLength = Number(request.headers.get('Content-Length') || 0)
+  if (contentLength > maxBytes) {
+    throw new BodyTooLargeError()
+  }
+
+  if (!request.body) {
+    return new Uint8Array()
+  }
+
+  const reader = request.body.getReader()
+  const chunks = []
+  let totalBytes = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
+      }
+
+      const chunk = value instanceof Uint8Array ? value : new Uint8Array(value)
+      totalBytes += chunk.byteLength
+      if (totalBytes > maxBytes) {
+        await reader.cancel()
+        throw new BodyTooLargeError()
+      }
+      chunks.push(chunk)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const body = new Uint8Array(totalBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return body
 }
 
 function withCloudHeaders(response) {
@@ -193,39 +243,108 @@ async function handlePutArtworks(request, env) {
 }
 
 async function handlePutArtworkImage(request, env, artworkId, imageType) {
+  const requestId = getUploadRequestId(request)
+  const routeStartedAt = Date.now()
+  const baseDiagnostic = { requestId, artworkId, imageType }
+  logInfo('cloud.image_upload.worker.start', 'Upload route received.', baseDiagnostic)
+
   const auth = await requireAuthenticatedUser(request, env)
   if (auth.error) {
+    logInfo('cloud.image_upload.worker.end', 'Authentication rejected upload.', {
+      ...baseDiagnostic,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: auth.error.status,
+    })
     return withCloudHeaders(auth.error)
   }
 
   if (!env.ARTWORK_BUCKET) {
+    logInfo('cloud.image_upload.worker.end', 'Cloud storage unavailable.', {
+      ...baseDiagnostic,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 503,
+    })
     return withCloudHeaders(jsonError(503, 'service_unavailable', 'Cloud storage is not available.'))
   }
 
   const owned = await assertArtworkOwnedByUser(env.DB, auth.user.id, artworkId)
   if (!owned) {
+    logInfo('cloud.image_upload.worker.end', 'Artwork was not found.', {
+      ...baseDiagnostic,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 404,
+    })
     return withCloudHeaders(jsonError(404, 'not_found', 'Artwork not found.'))
   }
 
   const contentType = request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase()
   if (!contentType || !ALLOWED_IMAGE_TYPES.has(contentType)) {
+    logInfo('cloud.image_upload.worker.end', 'Unsupported image content type.', {
+      ...baseDiagnostic,
+      contentType: contentType || null,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 400,
+    })
     return withCloudHeaders(
       jsonError(400, 'invalid_content_type', 'Image must be JPEG, PNG, WebP, or GIF.'),
     )
   }
 
   const maxBytes = imageType === 'thumbnail' ? CLOUD_MAX_THUMBNAIL_BYTES : CLOUD_MAX_IMAGE_BYTES
-  const contentLength = Number(request.headers.get('Content-Length') || 0)
-  if (contentLength > maxBytes) {
-    return withCloudHeaders(jsonError(413, 'payload_too_large', 'Image is too large.'))
+  const bodyReadStartedAt = Date.now()
+  logInfo('cloud.image_upload.worker.body.start', 'Reading upload body.', {
+    ...baseDiagnostic,
+    contentType,
+    contentLength: request.headers.get('Content-Length') || null,
+  })
+
+  let body
+  try {
+    body = await readImageBodyWithLimit(request, maxBytes)
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      logInfo('cloud.image_upload.worker.body.error', 'Upload body exceeded size limit.', {
+        ...baseDiagnostic,
+        contentType,
+        elapsedMs: Date.now() - bodyReadStartedAt,
+        status: 413,
+      })
+      return withCloudHeaders(jsonError(413, 'payload_too_large', 'Image is too large.'))
+    }
+    logError('cloud.image_upload.worker.body.error', error, {
+      ...baseDiagnostic,
+      contentType,
+      elapsedMs: Date.now() - bodyReadStartedAt,
+    })
+    return withCloudHeaders(jsonError(400, 'invalid_image', 'Could not read image upload.'))
   }
 
-  const body = await request.arrayBuffer()
+  logInfo('cloud.image_upload.worker.body.end', 'Upload body read.', {
+    ...baseDiagnostic,
+    contentType,
+    byteSize: body.byteLength,
+    elapsedMs: Date.now() - bodyReadStartedAt,
+  })
+
   if (body.byteLength > maxBytes) {
+    logInfo('cloud.image_upload.worker.end', 'Upload body exceeded size limit.', {
+      ...baseDiagnostic,
+      contentType,
+      byteSize: body.byteLength,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 413,
+    })
     return withCloudHeaders(jsonError(413, 'payload_too_large', 'Image is too large.'))
   }
 
   if (body.byteLength === 0) {
+    logInfo('cloud.image_upload.worker.end', 'Upload body was empty.', {
+      ...baseDiagnostic,
+      contentType,
+      byteSize: 0,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 400,
+    })
     return withCloudHeaders(jsonError(400, 'invalid_image', 'Image body is empty.'))
   }
 
@@ -235,17 +354,66 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
     RATE_LIMITS.CLOUD_IMAGE_UPLOAD,
   )
   if (!rateLimit.allowed) {
+    logInfo('cloud.image_upload.worker.end', 'Image upload was rate limited.', {
+      ...baseDiagnostic,
+      contentType,
+      byteSize: body.byteLength,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 429,
+    })
     return withCloudHeaders(
       jsonError(429, 'rate_limit', 'Too many image uploads. Please wait and try again.'),
     )
   }
 
   try {
+    let storageStartedAt = null
+    const storageHooks = {
+      onStorageStart() {
+        storageStartedAt = Date.now()
+        logInfo('cloud.image_upload.worker.storage.start', 'Starting object storage write.', {
+          ...baseDiagnostic,
+          contentType,
+          byteSize: body.byteLength,
+        })
+      },
+      onStorageEnd() {
+        logInfo('cloud.image_upload.worker.storage.end', 'Object storage write completed.', {
+          ...baseDiagnostic,
+          contentType,
+          byteSize: body.byteLength,
+          elapsedMs: storageStartedAt ? Date.now() - storageStartedAt : null,
+        })
+      },
+    }
     const result =
       imageType === 'thumbnail'
-        ? await saveArtworkThumbnail(env.DB, env.ARTWORK_BUCKET, auth.user.id, artworkId, body, contentType)
-        : await saveArtworkOriginal(env.DB, env.ARTWORK_BUCKET, auth.user.id, artworkId, body, contentType)
+        ? await saveArtworkThumbnail(
+            env.DB,
+            env.ARTWORK_BUCKET,
+            auth.user.id,
+            artworkId,
+            body,
+            contentType,
+            storageHooks,
+          )
+        : await saveArtworkOriginal(
+            env.DB,
+            env.ARTWORK_BUCKET,
+            auth.user.id,
+            artworkId,
+            body,
+            contentType,
+            storageHooks,
+          )
 
+    logInfo('cloud.image_upload.worker.end', 'Upload completed.', {
+      ...baseDiagnostic,
+      contentType,
+      byteSize: body.byteLength,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 200,
+    })
     return withCloudHeaders(
       jsonOk({
         ok: true,
@@ -254,7 +422,13 @@ async function handlePutArtworkImage(request, env, artworkId, imageType) {
       }),
     )
   } catch (error) {
-    logError('cloud.image_upload', error, { artworkId, imageType, userId: auth.user.id })
+    logError('cloud.image_upload.worker.error', error, {
+      ...baseDiagnostic,
+      contentType,
+      byteSize: body.byteLength,
+      elapsedMs: Date.now() - routeStartedAt,
+      status: 500,
+    })
     return withCloudHeaders(
       jsonError(500, 'upload_failed', 'Failed to save image to cloud storage.'),
     )
