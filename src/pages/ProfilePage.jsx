@@ -18,6 +18,7 @@ import { useArtworks } from '../hooks/useArtworks'
 import LoadingState from '../components/LoadingState'
 import { formatTime } from '../utils/formatTime'
 import { formatUserError } from '../utils/userErrors'
+import { wasLibraryClearedOnSignOut } from '../utils/clearLocalLibrary'
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
@@ -39,7 +40,8 @@ export default function ProfilePage() {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const shouldLoadStats = authenticated || artworks.length > 0
+  const shouldLoadStats =
+    authenticated || (!wasLibraryClearedOnSignOut() && artworks.length > 0)
 
   useEffect(() => {
     if (!shouldLoadStats) {

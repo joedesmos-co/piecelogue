@@ -76,6 +76,32 @@ describe('sync queue coalescing', () => {
     assert.equal(jobs[2].entityType, SYNC_ENTITY_TYPES.FOLDER)
     assert.equal(jobs[3].entityType, SYNC_ENTITY_TYPES.ARTWORK)
   })
+
+  it('preserves in-flight processing jobs when coalesced', () => {
+    const now = '2026-07-08T12:00:00.000Z'
+    const existing = {
+      id: 3,
+      userId: 'user-1',
+      entityType: 'artwork-image',
+      entityId: 'art-1',
+      status: 'processing',
+      processingStartedAt: '2026-07-08T11:59:00.000Z',
+      attempts: 1,
+      createdAt: '2026-07-08T11:00:00.000Z',
+      updatedAt: '2026-07-08T11:30:00.000Z',
+    }
+
+    const next = buildCoalescedJob(existing, {
+      userId: 'user-1',
+      entityType: 'artwork-image',
+      entityId: 'art-1',
+      now,
+    })
+
+    assert.equal(next.status, 'processing')
+    assert.equal(next.processingStartedAt, existing.processingStartedAt)
+    assert.equal(next.updatedAt, now)
+  })
 })
 
 describe('delete sync job types', () => {

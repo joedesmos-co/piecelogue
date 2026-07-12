@@ -328,4 +328,18 @@ describe('cloud sync progress copy', () => {
     assert.equal(details.description, 'Detailed upload progress is shown below.')
     assert.doesNotMatch(`${details.label} ${details.description}`, /Mario and Yoshi|original/i)
   })
+
+  it('allows force sync status copy while background sync is active', () => {
+    const details = getCloudSyncStatusDetails(
+      {
+        state: 'syncing',
+        pendingDeleteCount: 0,
+        activeUpload: null,
+        forceSyncActive: false,
+      },
+      false,
+    )
+
+    assert.equal(details.label, 'Syncing...')
+  })
 })

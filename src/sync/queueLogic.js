@@ -12,6 +12,13 @@ export function buildSyncJobKey(userId, entityType, entityId) {
 }
 
 export function buildCoalescedJob(existingJob, { userId, entityType, entityId, now }) {
+  if (existingJob?.status === 'processing') {
+    return {
+      ...existingJob,
+      updatedAt: now,
+    }
+  }
+
   const base = {
     userId,
     entityType,

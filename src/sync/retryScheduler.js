@@ -71,15 +71,12 @@ export async function recoverStuckProcessingJobs(
     return 0
   }
 
-  const getJobs = deps.getJobs ?? (async (id) => {
-    const { getSyncJobsForUser } = await import('../db/syncQueueService.js')
-    return getSyncJobsForUser(id)
-  })
-  const updateJob = deps.updateJob ?? (async (jobId, update) => {
-    const { updateSyncJob } = await import('../db/syncQueueService.js')
-    return updateSyncJob(jobId, update)
-  })
-
+  const getJobs =
+    deps.getJobs ??
+    (await import('../db/syncQueueService.js')).getSyncJobsForUser
+  const updateJob =
+    deps.updateJob ??
+    (await import('../db/syncQueueService.js')).updateSyncJob
   const jobs = await getJobs(userId)
   const stuckJobs = getStuckProcessingJobsToRecover(jobs, thresholdMs, now)
   let recovered = 0

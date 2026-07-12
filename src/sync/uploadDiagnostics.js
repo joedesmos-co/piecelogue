@@ -23,11 +23,21 @@ export function buildSafeUploadDiagnostic(details = {}) {
   }
 }
 
+function isDevEnvironment() {
+  return Boolean(import.meta.env?.DEV)
+}
+
 export function logUploadStart(details) {
+  if (!isDevEnvironment()) {
+    return
+  }
   console.info('[Piecelogue] cloud.image_upload.client.start', buildSafeUploadDiagnostic(details))
 }
 
 export function logUploadEnd(details) {
+  if (!isDevEnvironment()) {
+    return
+  }
   console.info('[Piecelogue] cloud.image_upload.client.end', buildSafeUploadDiagnostic(details))
 }
 

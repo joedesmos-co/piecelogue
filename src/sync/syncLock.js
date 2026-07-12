@@ -47,6 +47,6 @@ export function releaseArtworkUpload(artworkId) {
   artworkUploadsInFlight.delete(artworkId)
 }
 
-export function isArtworkUploadInFlight(artworkId) {
-  return artworkUploadsInFlight.has(artworkId)
+export function releaseAllArtworkUploads() {
+  artworkUploadsInFlight.clear()
 }

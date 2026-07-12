@@ -3,15 +3,16 @@ import { fetchMe, logout, requestSignInLink } from '../api/auth'
 import { clearSignedOutLibraryFlag } from '../utils/clearLocalLibrary'
 import { AuthContext } from './authContext'
 
-function clearAuthSuccessQuery() {
+function clearAuthQueryParams() {
   const url = new URL(window.location.href)
-  if (url.searchParams.get('auth') !== 'success') return false
+  const authStatus = url.searchParams.get('auth')
+  if (!authStatus) return false
 
   url.searchParams.delete('auth')
   url.searchParams.delete('view')
   const nextUrl = `${url.pathname}${url.search}${url.hash}`
   window.history.replaceState({}, '', nextUrl)
-  return true
+  return authStatus === 'success'
 }
 
 export function AuthProvider({ children }) {
@@ -44,7 +45,7 @@ export function AuthProvider({ children }) {
     let cancelled = false
 
     async function load() {
-      clearAuthSuccessQuery()
+      clearAuthQueryParams()
 
       try {
         setError(null)

@@ -28,6 +28,17 @@ function formatHandle(username) {
   return username.startsWith('@') ? username : `@${username}`
 }
 
+function readAuthNoticeFromUrl() {
+  const authStatus = new URLSearchParams(window.location.search).get('auth')
+  if (authStatus === 'error') {
+    return 'Sign-in was cancelled or failed. Please try again.'
+  }
+  if (authStatus === 'cancelled') {
+    return 'Sign-in was cancelled.'
+  }
+  return ''
+}
+
 export default function AccountSection() {
   const { authenticated, user, loading, error, signOut } = useAuth()
   const { refresh: refreshArtworks } = useArtworks()
@@ -40,6 +51,8 @@ export default function AccountSection() {
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState('')
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+
+  const [authNotice] = useState(readAuthNoticeFromUrl)
 
   useEffect(() => {
     if (!authenticated) {
@@ -118,6 +131,12 @@ export default function AccountSection() {
         <div className="settings-card">
           {loading || (authenticated && profileLoading) ? (
             <p className="settings-text settings-text--muted">Loading account...</p>
+          ) : null}
+
+          {!loading && authNotice ? (
+            <div className="alert alert--error" role="alert">
+              {authNotice}
+            </div>
           ) : null}
 
           {!loading && error ? (

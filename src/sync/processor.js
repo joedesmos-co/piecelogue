@@ -44,6 +44,7 @@ import { recoverStuckProcessingJobs, scheduleRetryWake } from './retryScheduler'
 import {
   isForceSyncActive,
   releaseArtworkUpload,
+  releaseAllArtworkUploads,
   shouldPauseBackgroundProcessor,
   tryAcquireArtworkUpload,
 } from './syncLock'
@@ -56,6 +57,7 @@ let wakeProcessor = null
 let statusListener = null
 let activeUploadDetail = null
 let activeBackgroundJobCount = 0
+let activeJobAbortController = null
 const backgroundIdleWaiters = new Set()
 
 export function setSyncStatusListener(listener) {
@@ -210,7 +212,14 @@ async function processArtworkJob(job) {
   return false
 }
 
-async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job) {
+export function resetSyncUploadRuntimeState() {
+  activeJobAbortController?.abort()
+  activeJobAbortController = null
+  setActiveUploadDetail(null)
+  releaseAllArtworkUploads()
+}
+
+async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job, signal) {
   const uploadDetails = {
     stage,
     artworkTitle: artwork.title,
@@ -236,6 +245,7 @@ async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job) {
     await uploadCloudArtworkOriginal(artwork.id, prepared.body, {
       contentType: prepared.mimeType,
       requestId,
+      signal,
       ...prepared,
     })
     return blob ? await hashBlob(blob) : storedHash
@@ -244,6 +254,7 @@ async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job) {
   await uploadCloudArtworkThumbnail(artwork.id, prepared.body, {
     contentType: prepared.mimeType,
     requestId,
+    signal,
     ...prepared,
   })
   return blob ? await hashBlob(blob) : storedHash
@@ -273,7 +284,14 @@ async function processArtworkImageJob(job) {
       originalBlob,
       uploadedOriginalHash,
       job,
+      activeJobAbortController?.signal,
     )
+    if (uploadedOriginalHash) {
+      await setImageHashes(job.userId, artwork.id, {
+        originalHash: uploadedOriginalHash,
+        thumbnailHash: uploadedThumbnailHash,
+      })
+    }
   }
 
   if (shouldUploadImage(thumbnailHash, stored?.thumbnailHash) && thumbnailBlob) {
@@ -283,6 +301,7 @@ async function processArtworkImageJob(job) {
       thumbnailBlob,
       uploadedThumbnailHash,
       job,
+      activeJobAbortController?.signal,
     )
   }
 
@@ -368,6 +387,7 @@ async function processReadyJobs(userId) {
     }
 
     activeBackgroundJobCount += 1
+    activeJobAbortController = new AbortController()
     try {
       await updateSyncJob(job.id, {
         status: SYNC_JOB_STATUS.PROCESSING,
@@ -386,6 +406,7 @@ async function processReadyJobs(userId) {
       }
       throw error
     } finally {
+      activeJobAbortController = null
       if (isImageJob) {
         setActiveUploadDetail(null)
         releaseArtworkUpload(job.entityId)
@@ -544,6 +565,20 @@ async function buildStatus(userId) {
     }
   }
 
+  if (activeUpload && pendingJobs.length === 0 && processingJobs.length === 0) {
+    return {
+      state: 'syncing',
+      pendingCount: 0,
+      pendingDeleteCount,
+      conflictCount: 0,
+      lastSyncedAt: state?.lastSyncedAt ?? null,
+      error: null,
+      failures: [],
+      activeUpload,
+      forceSyncActive: false,
+    }
+  }
+
   return {
     state: 'up-to-date',
     pendingCount: 0,
@@ -590,7 +625,7 @@ export function stopSyncProcessor() {
   processorAbort = true
   processorRunning = false
   wakeProcessor = null
-  setActiveUploadDetail(null)
+  resetSyncUploadRuntimeState()
 }
 
 export function startSyncProcessor(userId) {
@@ -672,7 +707,11 @@ export async function refreshSyncStatus(userId) {
 }
 
 export async function recoverSyncJobs(userId) {
-  return recoverStuckProcessingJobs(userId)
+  const recovered = await recoverStuckProcessingJobs(userId)
+  if (recovered > 0) {
+    resetSyncUploadRuntimeState()
+  }
+  return recovered
 }
 
 export async function recordForceSyncComplete(userId, artworks) {

@@ -142,8 +142,7 @@ export default function CloudSaveSection({ authenticated }) {
     progress?.total > 0 ? Math.round((progress.current / progress.total) * 100) : null
   const isBusy =
     status.state === 'syncing' || forcing || isRestoring || isRestoreChecking
-  const canForceSync =
-    !forcing && !isRestoring && !isRestoreChecking && status.state !== 'syncing'
+  const canForceSync = !forcing && !isRestoring && !isRestoreChecking
 
   return (
     <section className="settings-section" aria-labelledby="cloud-sync-heading">
