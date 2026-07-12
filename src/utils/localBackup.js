@@ -2,7 +2,9 @@ import { db } from '../db/database.js'
 import * as artworkService from '../db/artworkService.js'
 import * as folderService from '../db/folderService.js'
 import { APP_NAME, APP_VERSION } from './constants.js'
-import { getFullImageBlob, getGalleryImageBlob } from './imageUtils.js'
+import { IMAGE_KINDS } from '../db/artworkImageKeys'
+import { readArtworkImageBytes, bytesToBlob } from '../db/artworkImageReader'
+import { writeIncomingImageBytes } from '../db/legacyImageMigration'
 import {
   getBackupVersion,
   MAX_BACKUP_BYTES,
@@ -58,20 +60,24 @@ export async function buildLocalBackup() {
 
   for (const artwork of artworks) {
     const record = serializeArtwork(artwork)
-    const imageBlob = getFullImageBlob(artwork)
-    const thumbnailBlob = getGalleryImageBlob(artwork)
 
-    if (imageBlob) {
+    const original = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, {
+      legacyBlob: artwork.image,
+    })
+    if (original.ok) {
       record.image = {
-        type: imageBlob.type || 'image/jpeg',
-        data: await blobToBase64(imageBlob),
+        type: original.mimeType || 'image/jpeg',
+        data: await blobToBase64(bytesToBlob(original.bytes, original.mimeType)),
       }
     }
 
-    if (thumbnailBlob && thumbnailBlob !== imageBlob) {
+    const thumbnail = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, {
+      legacyBlob: artwork.thumbnail,
+    })
+    if (thumbnail.ok) {
       record.thumbnail = {
-        type: thumbnailBlob.type || 'image/jpeg',
-        data: await blobToBase64(thumbnailBlob),
+        type: thumbnail.mimeType || 'image/jpeg',
+        data: await blobToBase64(bytesToBlob(thumbnail.bytes, thumbnail.mimeType)),
       }
     }
 
@@ -133,7 +139,7 @@ export async function importLocalBackup(backup) {
   const validated = validateLocalBackup(backup)
   const now = new Date().toISOString()
 
-  await db.transaction('rw', db.folders, db.artworks, async () => {
+  await db.transaction('rw', db.folders, db.artworks, db.artworkImages, async () => {
     for (const folder of validated.folders) {
       const existing = await db.folders.get(folder.id)
       await db.folders.put({
@@ -169,11 +175,13 @@ export async function importLocalBackup(backup) {
       }
 
       if (artwork.image?.data) {
-        record.image = base64ToBlob(artwork.image.data, artwork.image.type)
+        const imageBlob = base64ToBlob(artwork.image.data, artwork.image.type)
+        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, imageBlob)
       }
 
       if (artwork.thumbnail?.data) {
-        record.thumbnail = base64ToBlob(artwork.thumbnail.data, artwork.thumbnail.type)
+        const thumbnailBlob = base64ToBlob(artwork.thumbnail.data, artwork.thumbnail.type)
+        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, thumbnailBlob)
       }
 
       await db.artworks.put(record)

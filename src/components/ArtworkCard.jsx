@@ -1,7 +1,6 @@
 import { Heart, Clock, Folder, MoreHorizontal } from 'lucide-react'
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
-import { getGalleryImageBlobs } from '../utils/imageUtils'
 import { getFolderPathLabel } from '../utils/folderTree'
 import { useLongPress } from '../hooks/useLongPress'
 import ArtworkImage from './ArtworkImage'
@@ -17,7 +16,6 @@ export default function ArtworkCard({
   isDragging = false,
   isDragSource = false,
 }) {
-  const imageBlobs = getGalleryImageBlobs(artwork)
   const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
 
   const { longPressHandlers } = useLongPress({
@@ -56,7 +54,8 @@ export default function ArtworkCard({
     >
       <div className="artwork-card-image-wrap">
         <ArtworkImage
-          blobs={imageBlobs}
+          artwork={artwork}
+          mode="gallery"
           alt=""
           className="artwork-card-image"
           fallbackClassName="artwork-card-placeholder"

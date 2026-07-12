@@ -6,7 +6,9 @@ import {
 } from '../db/restoreService'
 import { setImageHashes } from '../db/syncImageHashService'
 import { markLibrarySeeded, setLastSyncedAt } from '../db/syncStateService'
-import { hashBlob } from '../sync/imageHash'
+import { hashBytes } from '../sync/imageHash'
+import { IMAGE_KINDS } from '../db/artworkImageKeys'
+import { readArtworkImageBytes } from '../db/artworkImageReader'
 import {
   buildImageDownloadSteps,
   toLocalArtworkMetadata,
@@ -89,7 +91,9 @@ export async function restoreLibraryFromCloud({ userId, onProgress } = {}) {
       const blob = await downloadCloudArtworkImage(step.artworkId, step.type)
       await saveRestoredArtworkImage(step.artworkId, step.type, blob)
 
-      const hash = await hashBlob(blob)
+      const kind = step.type === 'thumbnail' ? IMAGE_KINDS.THUMBNAIL : IMAGE_KINDS.ORIGINAL
+      const read = await readArtworkImageBytes(step.artworkId, kind)
+      const hash = read.ok ? await hashBytes(read.bytes) : null
       const entry = downloadedHashes.get(step.artworkId) || {}
       if (step.type === 'original') {
         entry.originalHash = hash

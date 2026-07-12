@@ -9,11 +9,15 @@ import {
   Tag,
   Layers,
   Maximize2,
+  ImagePlus,
 } from 'lucide-react'
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
-import { getFullImageBlob, getFullImageBlobs } from '../utils/imageUtils'
 import { getFolderPathLabel } from '../utils/folderTree'
+import { isValidImageFile } from '../utils/imageUtils'
+import { useArtworkImageSource } from '../hooks/useArtworkImageSource'
+import { repairArtworkImage } from '../db/artworkService'
+import { formatUserError } from '../utils/userErrors'
 import ArtworkImage from './ArtworkImage'
 import ImageLightbox from './ImageLightbox'
 
@@ -35,11 +39,17 @@ export default function ArtworkDetail({
   onEdit,
   onDelete,
   onToggleFavorite,
+  onImageRepaired,
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [repairInputKey, setRepairInputKey] = useState(0)
+  const [repairError, setRepairError] = useState('')
+  const [repairing, setRepairing] = useState(false)
   const imageTriggerRef = useRef(null)
-  const imageBlobs = getFullImageBlobs(artwork)
-  const imageBlob = getFullImageBlob(artwork)
+  const { blob: imageBlob, unavailable: imageUnavailable } = useArtworkImageSource(
+    artwork,
+    'detail',
+  )
   const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
 
   const formattedDate = artwork.artworkDate
@@ -49,6 +59,26 @@ export default function ArtworkDetail({
         day: 'numeric',
       })
     : null
+
+  async function handleRepairImage(file) {
+    if (!file || !isValidImageFile(file)) {
+      setRepairError('Please select a valid image file (JPEG, PNG, WebP, or GIF).')
+      return
+    }
+
+    setRepairing(true)
+    setRepairError('')
+
+    try {
+      await repairArtworkImage(artwork.id, file)
+      setRepairInputKey((value) => value + 1)
+      onImageRepaired?.()
+    } catch (error) {
+      setRepairError(formatUserError(error, 'Could not repair artwork image.'))
+    } finally {
+      setRepairing(false)
+    }
+  }
 
   return (
     <div className="artwork-detail">
@@ -96,7 +126,8 @@ export default function ArtworkDetail({
             disabled={!imageBlob}
           >
             <ArtworkImage
-              blobs={imageBlobs}
+              artwork={artwork}
+              mode="detail"
               alt={artwork.title}
               className="detail-image"
               fallbackClassName="detail-image-placeholder"
@@ -108,6 +139,36 @@ export default function ArtworkDetail({
               </span>
             )}
           </button>
+          {imageUnavailable ? (
+            <div className="detail-image-repair">
+              <p className="settings-text settings-text--muted">
+                This image can no longer be read on this device. Re-select the image to repair it.
+              </p>
+              {repairError ? (
+                <div className="alert alert--error" role="alert">
+                  {repairError}
+                </div>
+              ) : null}
+              <label className="btn btn--secondary btn--sm">
+                <ImagePlus size={14} aria-hidden="true" />
+                {repairing ? 'Repairing...' : 'Repair image'}
+                <input
+                  key={repairInputKey}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  hidden
+                  disabled={repairing}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (file) {
+                      handleRepairImage(file)
+                    }
+                  }}
+                />
+              </label>
+            </div>
+          ) : null}
         </div>
 
         <div className="detail-info">

@@ -111,7 +111,74 @@ export function detectImageFormat(bytes, declaredMimeType = '') {
   }
 }
 
+export async function prepareBytesForUpload(bytes, details = {}) {
+  const normalized = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  const byteSize = normalized.byteLength
+
+  if (byteSize === 0) {
+    throw new ImageUploadError('Image file is empty.', 'empty_blob', {
+      ...details,
+      byteSize: 0,
+      permanent: true,
+    })
+  }
+
+  const declaredMimeType = (details.mimeType || '').split(';')[0].trim().toLowerCase()
+  const detected = detectImageFormat(normalized, declaredMimeType)
+  const mimeType = detected.mimeType
+  const format = detected.format
+
+  if (isHeicMimeType(mimeType) || format === 'HEIC' || format === 'HEIF') {
+    throw new ImageUploadError(
+      'This image format cannot be uploaded yet.',
+      'unsupported_format',
+      {
+        ...details,
+        mimeType,
+        byteSize,
+        permanent: true,
+      },
+    )
+  }
+
+  const maxBytes =
+    details.stage === 'thumbnail' ? MAX_THUMBNAIL_UPLOAD_BYTES : MAX_ORIGINAL_UPLOAD_BYTES
+  if (byteSize > maxBytes) {
+    throw new ImageUploadError('Image is too large to upload.', 'payload_too_large', {
+      ...details,
+      mimeType,
+      byteSize,
+      permanent: true,
+    })
+  }
+
+  if (!isSupportedUploadMime(mimeType)) {
+    throw new ImageUploadError(
+      `Unsupported image format (${mimeType}). Use JPEG, PNG, WebP, or GIF.`,
+      'unsupported_format',
+      {
+        ...details,
+        mimeType,
+        byteSize,
+        permanent: true,
+      },
+    )
+  }
+
+  return {
+    body: normalized,
+    mimeType,
+    format,
+    blobSize: byteSize,
+    byteSize,
+    exceedsLimit: false,
+  }
+}
+
 export async function prepareBlobForUpload(blob, details = {}) {
+  if (blob instanceof Uint8Array || blob instanceof ArrayBuffer) {
+    return prepareBytesForUpload(blob, details)
+  }
   if (!blob || typeof blob !== 'object') {
     throw new ImageUploadError('Image file is missing.', 'missing_image', {
       ...details,
@@ -128,10 +195,14 @@ export async function prepareBlobForUpload(blob, details = {}) {
     if (error instanceof ImageUploadError) {
       throw error
     }
-    throw new ImageUploadError('Could not read image file.', 'unreadable_blob', {
-      ...details,
-      permanent: true,
-    })
+    throw new ImageUploadError(
+      'This image can no longer be read on this device.',
+      'unreadable_blob',
+      {
+        ...details,
+        permanent: true,
+      },
+    )
   }
 
   const byteSize = buffer.byteLength

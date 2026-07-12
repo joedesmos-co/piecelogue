@@ -1,9 +1,19 @@
 import { db } from './database'
 import { generateId } from '../utils/id'
 import { calculateTotalMinutes } from '../utils/formatTime'
-import { createThumbnail, coalesceArtworkBlobs } from '../utils/imageUtils'
+import { createThumbnail } from '../utils/imageUtils'
 import { resolveMediumType, MEDIUM_TYPES } from '../utils/constants'
 import { buildMetadataOnlyArtworkRecord } from './artworkPreservationCore'
+import { IMAGE_KINDS } from './artworkImageKeys'
+import {
+  clearImageRecoveryRequired,
+  deleteDurableImagesForArtwork,
+  hasVerifiedDurableImage,
+} from './artworkImageStorage'
+import { enqueueArtworkImageSync } from '../sync/enqueue'
+import { resetFailedJobsForUser } from '../db/syncQueueService'
+import { getActiveSyncUserId } from '../sync/activeUser'
+import { writeIncomingImageBytes } from './legacyImageMigration'
 
 function normalizeMediumType(value, fallbackArtwork) {
   if (value && MEDIUM_TYPES.includes(value)) return value
@@ -38,9 +48,8 @@ function normalizeArtworkData(data, existing = null) {
 function normalizeArtworkRecord(artwork) {
   if (!artwork) return artwork
 
-  const coalesced = coalesceArtworkBlobs(artwork)
   const normalized = {
-    ...coalesced,
+    ...artwork,
     mediumType: resolveMediumType(artwork),
     folderId: artwork.folderId ?? null,
   }
@@ -48,6 +57,14 @@ function normalizeArtworkRecord(artwork) {
   delete normalized.category
   delete normalized.collection
   return normalized
+}
+
+async function persistArtworkImages(artworkId, imageBlob) {
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, imageBlob)
+  const thumbnailBlob = await createThumbnail(imageBlob)
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, thumbnailBlob)
+  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
+  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
 }
 
 async function saveArtworkRecord(existing, scalarUpdates, imageBlob = null) {
@@ -58,11 +75,7 @@ async function saveArtworkRecord(existing, scalarUpdates, imageBlob = null) {
   })
 
   if (imageBlob) {
-    record = {
-      ...record,
-      image: imageBlob,
-      thumbnail: await createThumbnail(imageBlob),
-    }
+    await persistArtworkImages(record.id, imageBlob)
   }
 
   await db.artworks.put(record)
@@ -91,6 +104,20 @@ export async function getArtworksByFolderId(folderId) {
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
 }
 
+export async function artworkHasLocalImage(artworkId, kind = IMAGE_KINDS.ORIGINAL) {
+  if (await hasVerifiedDurableImage(artworkId, kind)) {
+    return true
+  }
+
+  const artwork = await db.artworks.get(artworkId)
+  if (!artwork) {
+    return false
+  }
+
+  const legacy = kind === IMAGE_KINDS.THUMBNAIL ? artwork.thumbnail : artwork.image
+  return Boolean(legacy)
+}
+
 export async function createArtwork(data, imageBlob) {
   if (!imageBlob) {
     throw new Error('An artwork image is required.')
@@ -101,19 +128,17 @@ export async function createArtwork(data, imageBlob) {
     throw new Error('A title is required.')
   }
 
-  const thumbnail = await createThumbnail(imageBlob)
   const now = new Date().toISOString()
   const id = generateId()
 
   const artwork = {
     id,
     ...normalized,
-    image: imageBlob,
-    thumbnail,
     createdAt: now,
     updatedAt: now,
   }
 
+  await persistArtworkImages(id, imageBlob)
   await db.artworks.add(artwork)
   return artwork
 }
@@ -132,6 +157,24 @@ export async function updateArtwork(id, data, imageBlob = null) {
   return saveArtworkRecord(existing, normalized, imageBlob)
 }
 
+export async function repairArtworkImage(id, imageBlob) {
+  const existing = await db.artworks.get(id)
+  if (!existing) {
+    throw new Error('Artwork not found.')
+  }
+  if (!imageBlob) {
+    throw new Error('An artwork image is required.')
+  }
+
+  await persistArtworkImages(id, imageBlob)
+  const userId = getActiveSyncUserId()
+  if (userId) {
+    await resetFailedJobsForUser(userId)
+    await enqueueArtworkImageSync(id)
+  }
+  return saveArtworkRecord(existing, {})
+}
+
 export async function moveArtworkToFolder(id, folderId) {
   const existing = await db.artworks.get(id)
   if (!existing) {
@@ -144,7 +187,10 @@ export async function moveArtworkToFolder(id, folderId) {
 }
 
 export async function deleteArtwork(id) {
-  await db.artworks.delete(id)
+  await db.transaction('rw', db.artworks, db.artworkImages, async () => {
+    await deleteDurableImagesForArtwork(id)
+    await db.artworks.delete(id)
+  })
 }
 
 export async function toggleFavorite(id) {

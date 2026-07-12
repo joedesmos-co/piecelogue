@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FolderPlus, ImageIcon } from 'lucide-react'
 import { useArtworks } from '../hooks/useArtworks'
 import { useAuth } from '../hooks/useAuth'
+import { useSync } from '../hooks/useSync'
 import { wasLibraryClearedOnSignOut } from '../utils/clearLocalLibrary'
 import { GALLERY_VIEWS } from '../utils/constants'
 import {
@@ -36,7 +37,9 @@ export default function GalleryPage({ onAdd, onEdit }) {
     createFolder,
     updateFolder,
     removeFolder,
+    refresh,
   } = useArtworks()
+  const { retryNow, wakeSync } = useSync()
 
   const [view, setView] = useState(GALLERY_VIEWS.HOME)
   const [selectedFolderId, setSelectedFolderId] = useState(null)
@@ -267,6 +270,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
           }}
           onDelete={(artwork) => setDeleteTarget(artwork)}
           onToggleFavorite={handleToggleFavorite}
+          onImageRepaired={async () => {
+            await refresh()
+            await retryNow()
+            wakeSync()
+          }}
         />
         <ConfirmDialog
           isOpen={Boolean(deleteTarget)}

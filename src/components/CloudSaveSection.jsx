@@ -10,6 +10,7 @@ import { wakeSyncProcessor } from '../sync/processor'
 import { getCloudSyncStatusDetails } from '../sync/cloudSyncStatus'
 import { cancelForceSync } from '../sync/syncLock'
 import { CloudConflictPanel } from './CloudConflictSection'
+import ImageRecoveryPanel from './ImageRecoveryPanel'
 import { describeSyncJobStageLabel } from '../sync/statusDetails'
 
 function formatTimestamp(value) {
@@ -203,6 +204,10 @@ export default function CloudSaveSection({ authenticated }) {
         ) : null}
 
         <CloudConflictPanel />
+
+        {status.state === 'recovery_required' || status.recoveryRequired?.length > 0 ? (
+          <ImageRecoveryPanel entries={status.recoveryRequired ?? []} onRepaired={retryNow} />
+        ) : null}
 
         {statusLoading ? (
           <p className="settings-text settings-text--muted" role="status">

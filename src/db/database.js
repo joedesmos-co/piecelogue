@@ -122,3 +122,15 @@ db.version(6).stores({
     }
   })
 })
+
+db.version(7).stores({
+  folders: 'id, parentFolderId, name, createdAt, updatedAt, cloudRevision',
+  artworks:
+    'id, title, mediumType, medium, folderId, status, favorite, artworkDate, createdAt, updatedAt, totalMinutes, cloudRevision',
+  artworkImages: '&id, artworkId, kind, updatedAt',
+  syncQueue:
+    '++id, &[userId+entityType+entityId], userId, entityType, entityId, priority, status, nextRetryAt, updatedAt',
+  syncImageHashes: '&id, userId, artworkId',
+  syncState: 'userId',
+  syncConflicts: '&id, userId, entityType, entityId, jobId',
+})

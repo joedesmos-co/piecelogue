@@ -8,7 +8,7 @@ import {
 } from '../utils/constants'
 import { calculateTotalMinutes } from '../utils/formatTime'
 import { getFolderPickerOptions } from '../utils/folderTree'
-import { getFullImageBlobs, isValidImageFile } from '../utils/imageUtils'
+import { isValidImageFile } from '../utils/imageUtils'
 import ArtworkImage from './ArtworkImage'
 import SegmentedControl from './SegmentedControl'
 import FolderSelect from './FolderSelect'
@@ -52,7 +52,7 @@ export default function ArtworkForm({
     }
   }, [newImagePreview])
 
-  const existingImageBlobs = isEditing ? getFullImageBlobs(artwork) : []
+  const existingImageBlobs = isEditing ? artwork : null
 
   function handleImageChange(e) {
     const file = e.target.files?.[0]
@@ -147,10 +147,11 @@ export default function ArtworkForm({
                 Change image
               </label>
             </div>
-          ) : isEditing && existingImageBlobs.length > 0 ? (
+          ) : isEditing && existingImageBlobs ? (
             <div className="image-preview-wrap">
               <ArtworkImage
-                blobs={existingImageBlobs}
+                artwork={existingImageBlobs}
+                mode="detail"
                 alt="Preview"
                 className="image-preview"
                 fallbackClassName="image-preview image-preview--fallback"

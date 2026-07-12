@@ -35,8 +35,12 @@ import {
   SYNC_ENTITY_TYPES,
   SYNC_JOB_STATUS,
 } from './constants'
-import { hashBlob, shouldUploadImage } from './imageHash'
-import { prepareBlobForUpload } from './imageUpload'
+import { hashBytes, shouldUploadImage } from './imageHash'
+import { IMAGE_KINDS } from '../db/artworkImageKeys'
+import { readArtworkImageBytes } from '../db/artworkImageReader'
+import { markImageRecoveryRequired } from '../db/artworkImageStorage'
+import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration'
+import { getArtworksNeedingImageRecovery, resolveArtworkImageForSync } from '../db/imageRepair'
 import { createUploadRequestId } from './uploadDiagnostics'
 import { filterJobsForActiveUser, isJobReady, sortSyncJobs } from './queueLogic'
 import { buildRetryUpdate } from './retry'
@@ -49,7 +53,7 @@ import {
   tryAcquireArtworkUpload,
 } from './syncLock'
 import { summarizeSyncFailures } from './statusDetails'
-import { getFullImageBlob, getGalleryImageBlob } from '../utils/imageUtils'
+import { prepareBytesForUpload } from './imageUpload'
 
 let processorRunning = false
 let processorAbort = false
@@ -219,14 +223,15 @@ export function resetSyncUploadRuntimeState() {
   releaseAllArtworkUploads()
 }
 
-async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job, signal) {
+async function uploadArtworkImageStage(artwork, stage, imageBytes, mimeType, storedHash, job, signal) {
   const uploadDetails = {
     stage,
     artworkTitle: artwork.title,
     artworkId: artwork.id,
+    mimeType,
   }
 
-  const prepared = await prepareBlobForUpload(blob, uploadDetails)
+  const prepared = await prepareBytesForUpload(imageBytes, uploadDetails)
   const requestId = createUploadRequestId()
   setActiveUploadDetail({
     artworkId: artwork.id,
@@ -248,7 +253,7 @@ async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job, si
       signal,
       ...prepared,
     })
-    return blob ? await hashBlob(blob) : storedHash
+    return hashBytes(prepared.body)
   }
 
   await uploadCloudArtworkThumbnail(artwork.id, prepared.body, {
@@ -257,7 +262,7 @@ async function uploadArtworkImageStage(artwork, stage, blob, storedHash, job, si
     signal,
     ...prepared,
   })
-  return blob ? await hashBlob(blob) : storedHash
+  return hashBytes(prepared.body)
 }
 
 async function processArtworkImageJob(job) {
@@ -267,43 +272,39 @@ async function processArtworkImageJob(job) {
     return
   }
 
+  await ensureArtworkImagesMigrated(artwork.id)
   const stored = await getImageHashes(job.userId, job.entityId)
-  const originalBlob = getFullImageBlob(artwork)
-  const thumbnailBlob = getGalleryImageBlob(artwork)
 
-  const originalHash = originalBlob ? await hashBlob(originalBlob) : null
-  const thumbnailHash = thumbnailBlob ? await hashBlob(thumbnailBlob) : null
+  async function maybeUploadKind(kind, stage) {
+    const storedHash = kind === IMAGE_KINDS.ORIGINAL ? stored?.originalHash : stored?.thumbnailHash
+    const result = await resolveArtworkImageForSync(artwork, kind)
 
-  let uploadedOriginalHash = stored?.originalHash ?? null
-  let uploadedThumbnailHash = stored?.thumbnailHash ?? null
-
-  if (shouldUploadImage(originalHash, stored?.originalHash) && originalBlob) {
-    uploadedOriginalHash = await uploadArtworkImageStage(
-      artwork,
-      'original',
-      originalBlob,
-      uploadedOriginalHash,
-      job,
-      activeJobAbortController?.signal,
-    )
-    if (uploadedOriginalHash) {
-      await setImageHashes(job.userId, artwork.id, {
-        originalHash: uploadedOriginalHash,
-        thumbnailHash: uploadedThumbnailHash,
-      })
+    if (!result.ok) {
+      if (result.error.code === 'missing_image' && storedHash) {
+        return storedHash
+      }
+      await markImageRecoveryRequired(artwork.id, kind, result.error.code)
+      throw result.error
     }
-  }
 
-  if (shouldUploadImage(thumbnailHash, stored?.thumbnailHash) && thumbnailBlob) {
-    uploadedThumbnailHash = await uploadArtworkImageStage(
+    const localHash = await hashBytes(result.bytes)
+    if (!shouldUploadImage(localHash, storedHash)) {
+      return storedHash
+    }
+
+    return uploadArtworkImageStage(
       artwork,
-      'thumbnail',
-      thumbnailBlob,
-      uploadedThumbnailHash,
+      stage,
+      result.bytes,
+      result.mimeType,
+      storedHash,
       job,
       activeJobAbortController?.signal,
     )
   }
+
+  const uploadedOriginalHash = await maybeUploadKind(IMAGE_KINDS.ORIGINAL, 'original')
+  const uploadedThumbnailHash = await maybeUploadKind(IMAGE_KINDS.THUMBNAIL, 'thumbnail')
 
   if (uploadedOriginalHash || uploadedThumbnailHash) {
     await setImageHashes(job.userId, artwork.id, {
@@ -480,6 +481,31 @@ async function buildStatus(userId) {
   const failures = summarizeSyncFailures(jobs)
   const forceSyncActive = isForceSyncActive()
   const activeUpload = activeUploadDetail
+  const recoveryRequired = await getArtworksNeedingImageRecovery()
+  const recoveryRequiredWithTitles = await Promise.all(
+    recoveryRequired.map(async (entry) => {
+      const artwork = await db.artworks.get(entry.artworkId)
+      return {
+        ...entry,
+        title: artwork?.title || 'Untitled artwork',
+      }
+    }),
+  )
+
+  if (recoveryRequiredWithTitles.length > 0) {
+    return {
+      state: 'recovery_required',
+      pendingCount: pendingJobs.length + failedJobs.length + processingJobs.length,
+      pendingDeleteCount,
+      conflictCount: 0,
+      lastSyncedAt: state?.lastSyncedAt ?? null,
+      error: null,
+      failures,
+      activeUpload,
+      forceSyncActive: false,
+      recoveryRequired: recoveryRequiredWithTitles,
+    }
+  }
 
   if (forceSyncActive) {
     return {
@@ -723,10 +749,22 @@ export async function recordForceSyncComplete(userId, artworks) {
   await setLastSyncedAt(userId)
 
   for (const artwork of artworks) {
-    const originalBlob = getFullImageBlob(artwork)
-    const thumbnailBlob = getGalleryImageBlob(artwork)
-    const originalHash = originalBlob ? await hashBlob(originalBlob) : null
-    const thumbnailHash = thumbnailBlob ? await hashBlob(thumbnailBlob) : null
+    let originalHash = null
+    let thumbnailHash = null
+
+    const original = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, {
+      legacyBlob: artwork.image,
+    })
+    if (original.ok) {
+      originalHash = await hashBytes(original.bytes)
+    }
+
+    const thumbnail = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, {
+      legacyBlob: artwork.thumbnail,
+    })
+    if (thumbnail.ok) {
+      thumbnailHash = await hashBytes(thumbnail.bytes)
+    }
 
     if (originalHash || thumbnailHash) {
       await setImageHashes(userId, artwork.id, { originalHash, thumbnailHash })

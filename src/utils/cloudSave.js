@@ -2,6 +2,11 @@ import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
 import { clearSyncQueueForUser } from '../db/syncQueueService'
 import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevisionService'
+import { IMAGE_KINDS } from '../db/artworkImageKeys'
+import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration'
+import { resolveArtworkImageForSync } from '../db/imageRepair'
+import { markImageRecoveryRequired } from '../db/artworkImageStorage'
+import { ImageReadError } from '../db/imageReadError'
 import {
   uploadCloudArtworkOriginal,
   uploadCloudArtworkThumbnail,
@@ -9,7 +14,7 @@ import {
   uploadCloudFolders,
 } from '../api/cloud'
 import { toCloudArtworkMetadata, toCloudFolder } from '../sync/cloudPayload'
-import { describeImageUploadStage, prepareBlobForUpload } from '../sync/imageUpload'
+import { describeImageUploadStage, prepareBytesForUpload } from '../sync/imageUpload'
 import {
   recordForceSyncComplete,
   waitForBackgroundProcessorIdle,
@@ -23,19 +28,27 @@ import {
   tryAcquireForceSyncLock,
 } from '../sync/syncLock'
 import { ApiError } from './api'
-import { getFullImageBlob, getGalleryImageBlob } from './imageUtils'
 
 const METADATA_BATCH_SIZE = 25
 
-function buildImageUploadSteps(artworks) {
+async function buildImageUploadSteps(artworks) {
   const steps = []
 
   for (const artwork of artworks) {
-    if (getFullImageBlob(artwork)) {
-      steps.push({ artwork, type: 'original' })
+    await ensureArtworkImagesMigrated(artwork.id)
+    const original = await resolveArtworkImageForSync(artwork, IMAGE_KINDS.ORIGINAL)
+    if (original.ok) {
+      steps.push({ artwork, type: 'original', bytes: original.bytes, mimeType: original.mimeType })
     }
-    if (getGalleryImageBlob(artwork)) {
-      steps.push({ artwork, type: 'thumbnail' })
+
+    const thumbnail = await resolveArtworkImageForSync(artwork, IMAGE_KINDS.THUMBNAIL)
+    if (thumbnail.ok) {
+      steps.push({
+        artwork,
+        type: 'thumbnail',
+        bytes: thumbnail.bytes,
+        mimeType: thumbnail.mimeType,
+      })
     }
   }
 
@@ -55,7 +68,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
     await waitForBackgroundProcessorIdle(signal)
     const folders = await folderService.getAllFolders()
     const artworks = await artworkService.getAllArtworks()
-    const imageSteps = buildImageUploadSteps(artworks)
+    const imageSteps = await buildImageUploadSteps(artworks)
 
     onProgress?.({
       phase: 'folders',
@@ -111,8 +124,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
         throw new ApiError('Sync cancelled.', 'cancelled', 0)
       }
 
-      const { artwork, type } = imageSteps[index]
-      const blob = type === 'original' ? getFullImageBlob(artwork) : getGalleryImageBlob(artwork)
+      const { artwork, type, bytes, mimeType } = imageSteps[index]
 
       if (!tryAcquireArtworkUpload(artwork.id, 'force')) {
         throw new ApiError(
@@ -123,10 +135,11 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
       }
 
       try {
-        const prepared = await prepareBlobForUpload(blob, {
+        const prepared = await prepareBytesForUpload(bytes, {
           stage: type,
           artworkTitle: artwork.title,
           artworkId: artwork.id,
+          mimeType,
         })
         const requestId = createUploadRequestId()
 
@@ -160,6 +173,11 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
             ...prepared,
           })
         }
+      } catch (error) {
+        if (error instanceof ImageReadError) {
+          await markImageRecoveryRequired(artwork.id, type, error.code)
+        }
+        throw error
       } finally {
         releaseArtworkUpload(artwork.id)
       }

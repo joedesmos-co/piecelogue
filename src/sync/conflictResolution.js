@@ -11,7 +11,9 @@ import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevis
 import { setImageHashes } from '../db/syncImageHashService.js'
 import { toCloudArtworkMetadata, toCloudFolder } from './cloudPayload.js'
 import { SYNC_ENTITY_TYPES } from './constants.js'
-import { hashBlob } from './imageHash.js'
+import { IMAGE_KINDS } from '../db/artworkImageKeys.js'
+import { readArtworkImageBytes } from '../db/artworkImageReader.js'
+import { hashBytes } from './imageHash.js'
 import {
   extractUpsertRevision,
   localArtworkFromCloud,
@@ -24,13 +26,19 @@ async function downloadCloudArtworkImages(userId, artworkId, cloud) {
   if (cloud.hasOriginal) {
     const blob = await downloadCloudArtworkImage(artworkId, 'original')
     await saveRestoredArtworkImage(artworkId, 'original', blob)
-    hashes.originalHash = await hashBlob(blob)
+    const read = await readArtworkImageBytes(artworkId, IMAGE_KINDS.ORIGINAL)
+    if (read.ok) {
+      hashes.originalHash = await hashBytes(read.bytes)
+    }
   }
 
   if (cloud.hasThumbnail) {
     const blob = await downloadCloudArtworkImage(artworkId, 'thumbnail')
     await saveRestoredArtworkImage(artworkId, 'thumbnail', blob)
-    hashes.thumbnailHash = await hashBlob(blob)
+    const read = await readArtworkImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL)
+    if (read.ok) {
+      hashes.thumbnailHash = await hashBytes(read.bytes)
+    }
   }
 
   if (userId && (hashes.originalHash || hashes.thumbnailHash)) {

@@ -12,6 +12,7 @@ import {
   stopSyncProcessor,
   wakeSyncProcessor,
 } from '../sync/processor'
+import { runLegacyImageMigrationBatch } from '../db/legacyImageMigration'
 import { clearRetryScheduler } from '../sync/retryScheduler'
 import { SyncContext } from './syncContext'
 
@@ -25,6 +26,7 @@ const INITIAL_STATUS = {
   failures: [],
   activeUpload: null,
   forceSyncActive: false,
+  recoveryRequired: [],
 }
 
 export function SyncProvider({ children }) {
@@ -60,6 +62,14 @@ export function SyncProvider({ children }) {
     setActiveSyncUserId(userId)
 
     async function initialize() {
+      let migrationComplete = false
+      while (!migrationComplete && !cancelled) {
+        const migration = await runLegacyImageMigrationBatch()
+        migrationComplete = migration.complete
+      }
+      if (cancelled) {
+        return
+      }
       await seedInitialLibrarySync(userId)
       if (cancelled) {
         return

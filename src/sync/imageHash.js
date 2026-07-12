@@ -9,12 +9,33 @@ export async function hashArrayBuffer(buffer) {
   throw new Error('SHA-256 hashing is not available in this environment.')
 }
 
+export async function hashBytes(bytes) {
+  if (!bytes) {
+    return null
+  }
+
+  const buffer =
+    bytes instanceof ArrayBuffer
+      ? bytes
+      : bytes instanceof Uint8Array
+        ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+        : null
+
+  if (!buffer || buffer.byteLength === 0) {
+    return null
+  }
+
+  return hashArrayBuffer(buffer)
+}
+
 export async function hashBlob(blob) {
   if (!blob) {
     return null
   }
-  const buffer = await blob.arrayBuffer()
-  return hashArrayBuffer(buffer)
+
+  const { readBytesFromBlobValue } = await import('../db/readStoredImageBytes.js')
+  const read = await readBytesFromBlobValue(blob)
+  return hashBytes(read.bytes)
 }
 
 export function shouldUploadImage(localHash, storedHash) {

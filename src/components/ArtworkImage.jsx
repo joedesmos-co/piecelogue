@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { coalesceBlob } from '../utils/imageUtils'
 import { useObjectUrl } from '../hooks/useObjectUrl'
+import { useArtworkImageSource } from '../hooks/useArtworkImageSource'
 
 function blobsKey(blobs) {
   return blobs
@@ -10,6 +11,8 @@ function blobsKey(blobs) {
 }
 
 export default function ArtworkImage({
+  artwork,
+  mode = 'gallery',
   blob,
   blobs,
   alt = '',
@@ -18,10 +21,15 @@ export default function ArtworkImage({
   fallbackClassName = '',
   iconSize = 24,
 }) {
+  const durableSource = useArtworkImageSource(artwork, mode)
   const candidates = useMemo(() => {
+    if (artwork?.id) {
+      return durableSource.blob ? [durableSource.blob] : []
+    }
+
     const source = blobs?.length ? blobs : blob ? [blob] : []
     return source.map(coalesceBlob).filter(Boolean)
-  }, [blob, blobs])
+  }, [artwork, blob, blobs, durableSource.blob])
 
   const currentKey = blobsKey(candidates)
   const [trackedKey, setTrackedKey] = useState(currentKey)
@@ -50,7 +58,7 @@ export default function ArtworkImage({
     setExhausted(true)
   }
 
-  if (!candidates.length || exhausted) {
+  if (!candidates.length || exhausted || (artwork?.id && durableSource.unavailable)) {
     return (
       <div
         className={`artwork-image-fallback ${fallbackClassName || className}`}

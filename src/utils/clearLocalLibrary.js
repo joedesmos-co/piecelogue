@@ -3,6 +3,7 @@ import { db } from '../db/database.js'
 const LIBRARY_TABLES = [
   db.artworks,
   db.folders,
+  db.artworkImages,
   db.syncQueue,
   db.syncImageHashes,
   db.syncState,

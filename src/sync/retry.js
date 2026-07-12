@@ -7,6 +7,10 @@ export function classifySyncError(error) {
     return { retryable: true, permanent: false }
   }
 
+  if (error.name === 'ImageReadError') {
+    return { retryable: !error.permanent, permanent: Boolean(error.permanent) }
+  }
+
   if (error.name === 'ImageUploadError') {
     return { retryable: !error.permanent, permanent: Boolean(error.permanent) }
   }
@@ -58,7 +62,9 @@ export function buildRetryUpdate(job, error, now = new Date()) {
   const errorMessage =
     typeof error?.toDiagnosticString === 'function'
       ? error.toDiagnosticString()
-      : error?.message || 'Sync failed.'
+      : typeof error?.toUserMessage === 'function'
+        ? error.toUserMessage()
+        : error?.message || 'Sync failed.'
 
   if (!shouldRetryJob({ ...job, attempts }, classification)) {
     return {

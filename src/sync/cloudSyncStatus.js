@@ -63,6 +63,14 @@ export function getCloudSyncStatusDetails(status, forcing) {
             ? `${status.conflictCount} items need your review before sync can continue.`
             : 'An item was changed on another device. Review the conflict below.',
       }
+    case 'recovery_required':
+      return {
+        label: 'Image repair required',
+        description:
+          status.recoveryRequired?.length === 1
+            ? 'One artwork image on this device needs repair before sync can continue.'
+            : `${status.recoveryRequired?.length ?? 0} artwork images on this device need repair before sync can continue.`,
+      }
     default:
       return { label: null, description: null }
   }
