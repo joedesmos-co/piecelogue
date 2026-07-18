@@ -8,7 +8,8 @@ import {
 } from '../utils/constants'
 import { calculateTotalMinutes } from '../utils/formatTime'
 import { getFolderPickerOptions } from '../utils/folderTree'
-import { isValidImageFile } from '../utils/imageUtils'
+import { isAcceptedImportFile, normalizeArtworkImage } from '../utils/imageNormalize'
+import { formatUserError } from '../utils/userErrors'
 import ArtworkImage from './ArtworkImage'
 import SegmentedControl from './SegmentedControl'
 import FolderSelect from './FolderSelect'
@@ -54,17 +55,28 @@ export default function ArtworkForm({
 
   const existingImageBlobs = isEditing ? artwork : null
 
-  function handleImageChange(e) {
+  async function handleImageChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!isValidImageFile(file)) {
-      setError('Please select a valid image file (JPEG, PNG, WebP, or GIF).')
+    if (!isAcceptedImportFile(file)) {
+      setError('Please select an image file your browser can open.')
       return
     }
 
     setError('')
-    setImageFile(file)
+    try {
+      const normalized = await normalizeArtworkImage(file)
+      setImageFile(normalized.original)
+    } catch (err) {
+      setImageFile(null)
+      setError(
+        formatUserError(
+          err,
+          'Could not process this image. Try JPEG, PNG, or WebP.',
+        ),
+      )
+    }
   }
 
   function handleHoursChange(e) {
@@ -170,7 +182,7 @@ export default function ArtworkForm({
           <input
             id="artwork-image"
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/*,.heic,.heif"
             onChange={handleImageChange}
             className="sr-only"
           />

@@ -20,6 +20,8 @@ import {
   waitForBackgroundProcessorIdle,
   wakeSyncProcessor,
 } from '../sync/processor'
+import { reconcileIncompleteCloudImages } from '../sync/reconcileIncompleteCloudImages'
+import { ensureThumbnailFromOriginal } from '../db/artworkService'
 import { createUploadRequestId } from '../sync/uploadDiagnostics'
 import {
   releaseArtworkUpload,
@@ -36,6 +38,7 @@ async function buildImageUploadSteps(artworks) {
 
   for (const artwork of artworks) {
     await ensureArtworkImagesMigrated(artwork.id)
+    await ensureThumbnailFromOriginal(artwork.id)
     const original = await resolveArtworkImageForSync(artwork, IMAGE_KINDS.ORIGINAL)
     if (original.ok) {
       steps.push({ artwork, type: 'original', bytes: original.bytes, mimeType: original.mimeType })
@@ -186,6 +189,11 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
     if (userId) {
       await clearSyncQueueForUser(userId)
       await recordForceSyncComplete(userId, artworks)
+      try {
+        await reconcileIncompleteCloudImages(userId, { force: true })
+      } catch {
+        // Best-effort incomplete image detection after force sync.
+      }
     }
 
     onProgress?.({

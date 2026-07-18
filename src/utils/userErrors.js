@@ -6,10 +6,18 @@ const ERROR_MESSAGES = {
   timeout: 'Timed out — retry when your connection is stable.',
   cancelled: 'Sync cancelled.',
   sync_in_progress: 'Sync is already running.',
-  unsupported_format: 'Unsupported image format. Use JPEG, PNG, WebP, or GIF.',
-  unreadable_blob: 'This image can no longer be read on this device. Re-select the image to repair it.',
-  recovery_required: 'This image can no longer be read on this device. Re-select the image to repair it.',
-  invalid_content_type: 'Unsupported image format. Use JPEG, PNG, WebP, or GIF.',
+  unsupported_format: 'Unsupported image format. Please choose a photo your browser can open.',
+  heic_conversion_failed:
+    'This image could not be converted. Export it as JPEG or PNG, then try again.',
+  normalize_failed:
+    'This image could not be processed. Please try another file or export as JPEG/PNG.',
+  normalize_unavailable:
+    'This browser cannot process images. Please try a different browser or export as JPEG.',
+  corrupt_image: 'This image file appears to be damaged. Please try another file.',
+  image_upload_incomplete: 'Image upload incomplete. Missing original or thumbnail in cloud.',
+  cloud_incomplete:
+    'This image was never uploaded to cloud. Re-select it on the device that has the file, then sync again.',
+  invalid_content_type: 'Unsupported image format. Please choose a photo your browser can open.',
   service_unavailable: 'Cloud service is temporarily unavailable. Your changes are saved locally.',
   not_found: 'That item could not be found.',
   invalid_folder: 'Folder data could not be saved. Please try again.',

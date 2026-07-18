@@ -1,3 +1,5 @@
+import { normalizeArtworkImage } from './imageNormalize.js'
+
 const THUMBNAIL_MAX_SIZE = 400
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
@@ -102,53 +104,17 @@ export function readFileAsBlob(file) {
   })
 }
 
-export function createThumbnail(blob, maxSize = THUMBNAIL_MAX_SIZE) {
-  return new Promise((resolve, reject) => {
-    const source = coalesceBlob(blob)
-    if (!source) {
-      reject(new Error('Failed to load image.'))
-      return
-    }
+/**
+ * Create a JPEG thumbnail via the canonical normalization pipeline.
+ */
+export async function createThumbnail(blob, maxSize = THUMBNAIL_MAX_SIZE) {
+  const source = coalesceBlob(blob)
+  if (!source) {
+    throw new Error('Failed to load image.')
+  }
 
-    const img = new Image()
-    const url = URL.createObjectURL(source)
-
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-
-      let { width, height } = img
-      if (width > maxSize || height > maxSize) {
-        const ratio = Math.min(maxSize / width, maxSize / height)
-        width = Math.round(width * ratio)
-        height = Math.round(height * ratio)
-      }
-
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, width, height)
-
-      canvas.toBlob(
-        (thumbnailBlob) => {
-          if (thumbnailBlob) {
-            resolve(thumbnailBlob)
-          } else {
-            reject(new Error('Failed to create thumbnail.'))
-          }
-        },
-        'image/jpeg',
-        0.85,
-      )
-    }
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Failed to load image.'))
-    }
-
-    img.src = url
-  })
+  const normalized = await normalizeArtworkImage(source, { thumbnailMaxEdge: maxSize })
+  return normalized.thumbnail
 }
 
 export function createObjectUrl(blob) {

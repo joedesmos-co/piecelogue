@@ -14,6 +14,8 @@ export class ImageReadError extends Error {
       case 'recovery_required':
       case 'unreadable_blob':
         return 'This image can no longer be read on this device. Re-select the image to repair it.'
+      case 'cloud_incomplete':
+        return 'This image was never uploaded to cloud. Re-select the image to repair it, then sync again.'
       case 'missing_image':
         return 'Image file is missing on this device.'
       case 'empty_image':

@@ -7,6 +7,7 @@ import {
 } from './artworkImageStorage.js'
 import { writeIncomingImageBytes } from './legacyImageMigration.js'
 import { readStoredImageBytes } from './readStoredImageBytes.js'
+import { normalizeArtworkImage } from '../utils/imageNormalize.js'
 
 function cloudArtworkHasImage(cloudArtwork, kind) {
   if (kind === IMAGE_KINDS.THUMBNAIL) {
@@ -26,7 +27,19 @@ export async function tryRepairArtworkImageFromCloud(artworkId, kind, options = 
   }
 
   const blob = await downloadImage(artworkId, kind)
-  const read = await writeIncomingImageBytes(artworkId, kind, blob, options.deps)
+  const normalized = await normalizeArtworkImage(blob, {}, options.deps)
+  const targetBlob =
+    kind === IMAGE_KINDS.THUMBNAIL ? normalized.thumbnail : normalized.original
+  const read = await writeIncomingImageBytes(artworkId, kind, targetBlob, options.deps)
+  if (kind === IMAGE_KINDS.ORIGINAL) {
+    await writeIncomingImageBytes(
+      artworkId,
+      IMAGE_KINDS.THUMBNAIL,
+      normalized.thumbnail,
+      options.deps,
+    )
+    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+  }
   await clearImageRecoveryRequired(artworkId, kind)
   return {
     repaired: true,

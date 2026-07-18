@@ -14,7 +14,7 @@ import {
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getFolderPathLabel } from '../utils/folderTree'
-import { isValidImageFile } from '../utils/imageUtils'
+import { isAcceptedImportFile, normalizeArtworkImage } from '../utils/imageNormalize'
 import { useArtworkImageSource } from '../hooks/useArtworkImageSource'
 import { repairArtworkImage } from '../db/artworkService'
 import { formatUserError } from '../utils/userErrors'
@@ -61,8 +61,8 @@ export default function ArtworkDetail({
     : null
 
   async function handleRepairImage(file) {
-    if (!file || !isValidImageFile(file)) {
-      setRepairError('Please select a valid image file (JPEG, PNG, WebP, or GIF).')
+    if (!file || !isAcceptedImportFile(file)) {
+      setRepairError('Please select an image file your browser can open.')
       return
     }
 
@@ -70,7 +70,8 @@ export default function ArtworkDetail({
     setRepairError('')
 
     try {
-      await repairArtworkImage(artwork.id, file)
+      const normalized = await normalizeArtworkImage(file)
+      await repairArtworkImage(artwork.id, normalized.original)
       setRepairInputKey((value) => value + 1)
       onImageRepaired?.()
     } catch (error) {
@@ -155,7 +156,7 @@ export default function ArtworkDetail({
                 <input
                   key={repairInputKey}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/*,.heic,.heif"
                   hidden
                   disabled={repairing}
                   onChange={(event) => {

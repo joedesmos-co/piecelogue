@@ -52,8 +52,15 @@ import {
   shouldPauseBackgroundProcessor,
   tryAcquireArtworkUpload,
 } from './syncLock'
-import { summarizeSyncFailures } from './statusDetails'
+import {
+  getCachedIncompleteCloudImages,
+  getIncompleteCloudStatusPayload,
+  reconcileIncompleteCloudImages,
+  resetIncompleteCloudImageCache,
+} from './reconcileIncompleteCloudImages'
+import { buildIncompleteCloudSyncStatus } from './incompleteCloudImages'
 import { prepareBytesForUpload } from './imageUpload'
+import { summarizeSyncFailures } from './statusDetails'
 
 let processorRunning = false
 let processorAbort = false
@@ -273,14 +280,22 @@ async function processArtworkImageJob(job) {
   }
 
   await ensureArtworkImagesMigrated(artwork.id)
+  await artworkService.ensureThumbnailFromOriginal(artwork.id)
   const stored = await getImageHashes(job.userId, job.entityId)
+  const incompleteCloud = getCachedIncompleteCloudImages().find(
+    (entry) => entry.artworkId === artwork.id,
+  )
 
   async function maybeUploadKind(kind, stage) {
     const storedHash = kind === IMAGE_KINDS.ORIGINAL ? stored?.originalHash : stored?.thumbnailHash
+    const cloudMissing =
+      (kind === IMAGE_KINDS.ORIGINAL && incompleteCloud?.missingOriginal) ||
+      (kind === IMAGE_KINDS.THUMBNAIL && incompleteCloud?.missingThumbnail)
     const result = await resolveArtworkImageForSync(artwork, kind)
 
     if (!result.ok) {
-      if (result.error.code === 'missing_image' && storedHash) {
+      // Never treat a prior local hash as proof the cloud has the image.
+      if (result.error.code === 'missing_image' && storedHash && !cloudMissing) {
         return storedHash
       }
       await markImageRecoveryRequired(artwork.id, kind, result.error.code)
@@ -288,7 +303,7 @@ async function processArtworkImageJob(job) {
     }
 
     const localHash = await hashBytes(result.bytes)
-    if (!shouldUploadImage(localHash, storedHash)) {
+    if (!cloudMissing && !shouldUploadImage(localHash, storedHash)) {
       return storedHash
     }
 
@@ -605,6 +620,23 @@ async function buildStatus(userId) {
     }
   }
 
+  const incompleteCloudImages = await getIncompleteCloudStatusPayload(userId)
+  if (incompleteCloudImages?.length) {
+    const incompleteStatus = buildIncompleteCloudSyncStatus(incompleteCloudImages)
+    return {
+      state: incompleteStatus.state,
+      pendingCount: 0,
+      pendingDeleteCount,
+      conflictCount: 0,
+      lastSyncedAt: state?.lastSyncedAt ?? null,
+      error: incompleteStatus.description,
+      failures: [],
+      activeUpload: null,
+      forceSyncActive: false,
+      incompleteCloudImages,
+    }
+  }
+
   return {
     state: 'up-to-date',
     pendingCount: 0,
@@ -651,6 +683,7 @@ export function stopSyncProcessor() {
   processorAbort = true
   processorRunning = false
   wakeProcessor = null
+  resetIncompleteCloudImageCache()
   resetSyncUploadRuntimeState()
 }
 
@@ -691,6 +724,11 @@ export function startSyncProcessor(userId) {
 
         await publishStatus(userId)
         await processReadyJobs(userId)
+        try {
+          await reconcileIncompleteCloudImages(userId)
+        } catch {
+          // Cloud reconcile is best-effort; local queue processing continues.
+        }
         await publishStatus(userId)
 
         const jobs = await getSyncJobsForUser(userId)
@@ -727,6 +765,11 @@ export function startSyncProcessor(userId) {
 }
 
 export async function refreshSyncStatus(userId) {
+  try {
+    await reconcileIncompleteCloudImages(userId)
+  } catch {
+    // Ignore transient cloud status failures.
+  }
   const status = await buildStatus(userId)
   emitStatus(status)
   return status
@@ -736,6 +779,11 @@ export async function recoverSyncJobs(userId) {
   const recovered = await recoverStuckProcessingJobs(userId)
   if (recovered > 0) {
     resetSyncUploadRuntimeState()
+  }
+  try {
+    await reconcileIncompleteCloudImages(userId, { force: true })
+  } catch {
+    // Ignore transient cloud status failures.
   }
   return recovered
 }

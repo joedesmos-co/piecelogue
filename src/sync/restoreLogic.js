@@ -24,6 +24,8 @@ export function toLocalArtworkMetadata(cloudArtwork) {
     notes: cloudArtwork.notes ?? '',
     favorite: Boolean(cloudArtwork.favorite),
     cloudRevision: cloudArtwork.revision ?? 1,
+    cloudHasOriginal: Boolean(cloudArtwork.hasOriginal),
+    cloudHasThumbnail: Boolean(cloudArtwork.hasThumbnail),
     createdAt: cloudArtwork.createdAt,
     updatedAt: cloudArtwork.updatedAt,
   }
@@ -42,6 +44,14 @@ export function buildImageDownloadSteps(cloudArtworks) {
   }
 
   return steps
+}
+
+export function shouldRegenerateThumbnailFromCloud(cloudArtwork) {
+  return Boolean(cloudArtwork?.hasOriginal && !cloudArtwork?.hasThumbnail)
+}
+
+export function isCloudImageMissingOnRestore(cloudArtwork) {
+  return Boolean(cloudArtwork && !cloudArtwork.hasOriginal)
 }
 
 export function cloudLibraryHasData(status) {

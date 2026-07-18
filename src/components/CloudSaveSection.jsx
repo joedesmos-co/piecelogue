@@ -209,6 +209,18 @@ export default function CloudSaveSection({ authenticated }) {
           <ImageRecoveryPanel entries={status.recoveryRequired ?? []} onRepaired={retryNow} />
         ) : null}
 
+        {status.state === 'image_upload_incomplete' || status.incompleteCloudImages?.length > 0 ? (
+          <ImageRecoveryPanel
+            title="Image upload incomplete. Re-select the image on the device that still has the file, then sync."
+            entries={(status.incompleteCloudImages ?? []).map((entry) => ({
+              artworkId: entry.artworkId,
+              title: entry.title,
+              reasons: ['cloud_incomplete'],
+            }))}
+            onRepaired={retryNow}
+          />
+        ) : null}
+
         {statusLoading ? (
           <p className="settings-text settings-text--muted" role="status">
             <LoaderCircle size={14} className="cloud-save-spinner" aria-hidden="true" /> Checking
@@ -226,6 +238,9 @@ export default function CloudSaveSection({ authenticated }) {
           <div className="cloud-status-summary">
             <p className="settings-text">
               Cloud library: {cloudStatus.folderCount} folders, {cloudStatus.artworkCount} artworks
+              {typeof cloudStatus.artworkWithOriginalCount === 'number'
+                ? ` (${cloudStatus.artworkWithOriginalCount} with originals, ${cloudStatus.artworkWithThumbnailCount ?? 0} with thumbnails)`
+                : ''}
             </p>
           </div>
         ) : null}

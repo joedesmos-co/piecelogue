@@ -3,6 +3,8 @@ import { describe, it } from 'node:test'
 import {
   buildImageDownloadSteps,
   decideRestoreAction,
+  shouldRegenerateThumbnailFromCloud,
+  isCloudImageMissingOnRestore,
   toLocalArtworkMetadata,
   toLocalFolder,
 } from './restoreLogic.js'
@@ -135,6 +137,32 @@ describe('restore image download plan', () => {
     assert.deepEqual(
       steps.map((step) => `${step.artworkId}:${step.type}`),
       ['a1:original', 'a1:thumbnail', 'a2:original'],
+    )
+  })
+
+  it('restores original-only by regenerating thumbnail locally', () => {
+    assert.equal(
+      shouldRegenerateThumbnailFromCloud({ hasOriginal: true, hasThumbnail: false }),
+      true,
+    )
+    assert.equal(
+      shouldRegenerateThumbnailFromCloud({ hasOriginal: true, hasThumbnail: true }),
+      false,
+    )
+    assert.equal(
+      shouldRegenerateThumbnailFromCloud({ hasOriginal: false, hasThumbnail: false }),
+      false,
+    )
+  })
+
+  it('marks restore recovery when cloud original is missing', () => {
+    assert.equal(
+      isCloudImageMissingOnRestore({ hasOriginal: false, hasThumbnail: false }),
+      true,
+    )
+    assert.equal(
+      isCloudImageMissingOnRestore({ hasOriginal: true, hasThumbnail: false }),
+      false,
     )
   })
 })

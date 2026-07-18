@@ -9,11 +9,16 @@ import { markLibrarySeeded, setLastSyncedAt } from '../db/syncStateService'
 import { hashBytes } from '../sync/imageHash'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
 import { readArtworkImageBytes } from '../db/artworkImageReader'
+import { ensureThumbnailFromOriginal } from '../db/artworkService'
+import { markImageRecoveryRequired } from '../db/artworkImageStorage'
 import {
   buildImageDownloadSteps,
+  shouldRegenerateThumbnailFromCloud,
   toLocalArtworkMetadata,
   toLocalFolder,
 } from '../sync/restoreLogic'
+import { findIncompleteCloudArtworks } from '../sync/incompleteCloudImages'
+import { setCachedIncompleteCloudImages } from '../sync/reconcileIncompleteCloudImages'
 
 const MAX_IMAGE_DOWNLOAD_CONCURRENCY = 2
 
@@ -38,6 +43,8 @@ export async function restoreLibraryFromCloud({ userId, onProgress } = {}) {
   const folders = library.folders.map(toLocalFolder)
   const artworks = library.artworks.map(toLocalArtworkMetadata)
   const imageSteps = buildImageDownloadSteps(library.artworks)
+  const incompleteCloudImages = findIncompleteCloudArtworks(library.artworks)
+  setCachedIncompleteCloudImages(incompleteCloudImages)
 
   // Mark the library as seeded up front so the auto-sync first-login seeding
   // does not enqueue restored items for re-upload.
@@ -114,6 +121,29 @@ export async function restoreLibraryFromCloud({ userId, onProgress } = {}) {
     }
   })
 
+  // Original-only cloud artworks: regenerate a local thumbnail when possible.
+  for (const cloudArtwork of library.artworks) {
+    if (shouldRegenerateThumbnailFromCloud(cloudArtwork)) {
+      try {
+        const result = await ensureThumbnailFromOriginal(cloudArtwork.id)
+        if (result.created) {
+          const read = await readArtworkImageBytes(cloudArtwork.id, IMAGE_KINDS.THUMBNAIL)
+          if (read.ok && userId) {
+            const entry = downloadedHashes.get(cloudArtwork.id) || {}
+            entry.thumbnailHash = await hashBytes(read.bytes)
+            downloadedHashes.set(cloudArtwork.id, entry)
+          }
+        }
+      } catch {
+        // Keep metadata; thumbnail can be repaired later.
+      }
+    }
+
+    if (!cloudArtwork.hasOriginal) {
+      await markImageRecoveryRequired(cloudArtwork.id, IMAGE_KINDS.ORIGINAL, 'cloud_incomplete')
+    }
+  }
+
   if (userId) {
     for (const [artworkId, hashes] of downloadedHashes) {
       await setImageHashes(userId, artworkId, hashes)
@@ -134,5 +164,7 @@ export async function restoreLibraryFromCloud({ userId, onProgress } = {}) {
     imageCount: imageSteps.length,
     failedImageCount: failedImages.length,
     failedImages,
+    incompleteCloudImageCount: incompleteCloudImages.length,
+    incompleteCloudImages,
   }
 }

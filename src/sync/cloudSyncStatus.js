@@ -71,6 +71,15 @@ export function getCloudSyncStatusDetails(status, forcing) {
             ? 'One artwork image on this device needs repair before sync can continue.'
             : `${status.recoveryRequired?.length ?? 0} artwork images on this device need repair before sync can continue.`,
       }
+    case 'image_upload_incomplete':
+      return {
+        label: 'Image upload incomplete',
+        description:
+          status.error ||
+          (status.incompleteCloudImages?.length === 1
+            ? `${status.incompleteCloudImages[0].title} is missing cloud images.`
+            : `${status.incompleteCloudImages?.length ?? 0} artworks are missing cloud images.`),
+      }
     default:
       return { label: null, description: null }
   }

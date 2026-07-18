@@ -1,7 +1,6 @@
 import { db } from './database'
 import { generateId } from '../utils/id'
 import { calculateTotalMinutes } from '../utils/formatTime'
-import { createThumbnail } from '../utils/imageUtils'
 import { resolveMediumType, MEDIUM_TYPES } from '../utils/constants'
 import { buildMetadataOnlyArtworkRecord } from './artworkPreservationCore'
 import { IMAGE_KINDS } from './artworkImageKeys'
@@ -14,6 +13,8 @@ import { enqueueArtworkImageSync } from '../sync/enqueue'
 import { resetFailedJobsForUser } from '../db/syncQueueService'
 import { getActiveSyncUserId } from '../sync/activeUser'
 import { writeIncomingImageBytes } from './legacyImageMigration'
+import { normalizeArtworkImage } from '../utils/imageNormalize'
+import { bytesToBlob, readArtworkImageBytes } from './artworkImageReader'
 
 function normalizeMediumType(value, fallbackArtwork) {
   if (value && MEDIUM_TYPES.includes(value)) return value
@@ -60,11 +61,29 @@ function normalizeArtworkRecord(artwork) {
 }
 
 async function persistArtworkImages(artworkId, imageBlob) {
-  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, imageBlob)
-  const thumbnailBlob = await createThumbnail(imageBlob)
-  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, thumbnailBlob)
+  const normalized = await normalizeArtworkImage(imageBlob)
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, normalized.original)
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
   await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
   await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+  return normalized
+}
+
+export async function ensureThumbnailFromOriginal(artworkId) {
+  if (await hasVerifiedDurableImage(artworkId, IMAGE_KINDS.THUMBNAIL)) {
+    return { created: false }
+  }
+
+  const original = await readArtworkImageBytes(artworkId, IMAGE_KINDS.ORIGINAL)
+  if (!original.ok) {
+    return { created: false, error: original.error }
+  }
+
+  const originalBlob = bytesToBlob(original.bytes, original.mimeType || 'image/jpeg')
+  const normalized = await normalizeArtworkImage(originalBlob)
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
+  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+  return { created: true }
 }
 
 async function saveArtworkRecord(existing, scalarUpdates, imageBlob = null) {

@@ -5,6 +5,7 @@ import { APP_NAME, APP_VERSION } from './constants.js'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
 import { readArtworkImageBytes, bytesToBlob } from '../db/artworkImageReader'
 import { writeIncomingImageBytes } from '../db/legacyImageMigration'
+import { normalizeArtworkImage } from './imageNormalize.js'
 import {
   getBackupVersion,
   MAX_BACKUP_BYTES,
@@ -176,12 +177,13 @@ export async function importLocalBackup(backup) {
 
       if (artwork.image?.data) {
         const imageBlob = base64ToBlob(artwork.image.data, artwork.image.type)
-        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, imageBlob)
-      }
-
-      if (artwork.thumbnail?.data) {
+        const normalized = await normalizeArtworkImage(imageBlob)
+        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, normalized.original)
+        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
+      } else if (artwork.thumbnail?.data) {
         const thumbnailBlob = base64ToBlob(artwork.thumbnail.data, artwork.thumbnail.type)
-        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, thumbnailBlob)
+        const normalized = await normalizeArtworkImage(thumbnailBlob)
+        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
       }
 
       await db.artworks.put(record)

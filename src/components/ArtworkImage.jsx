@@ -59,14 +59,31 @@ export default function ArtworkImage({
   }
 
   if (!candidates.length || exhausted || (artwork?.id && durableSource.unavailable)) {
+    const cloudIncomplete =
+      artwork &&
+      typeof artwork.cloudHasOriginal === 'boolean' &&
+      typeof artwork.cloudHasThumbnail === 'boolean' &&
+      (!artwork.cloudHasOriginal || !artwork.cloudHasThumbnail)
+
+    const fallbackText = cloudIncomplete
+      ? 'Image not uploaded to cloud yet'
+      : 'Image unavailable'
+    const fallbackLabel = cloudIncomplete
+      ? alt
+        ? `${alt} image not uploaded to cloud yet`
+        : 'Image not uploaded to cloud yet'
+      : alt
+        ? `${alt} unavailable`
+        : 'Image unavailable'
+
     return (
       <div
         className={`artwork-image-fallback ${fallbackClassName || className}`}
         role="img"
-        aria-label={alt ? `${alt} unavailable` : 'Image unavailable'}
+        aria-label={fallbackLabel}
       >
         <ImageOff size={iconSize} strokeWidth={1.5} aria-hidden="true" />
-        <span className="artwork-image-fallback-text">Image unavailable</span>
+        <span className="artwork-image-fallback-text">{fallbackText}</span>
       </div>
     )
   }

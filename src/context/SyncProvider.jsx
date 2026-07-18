@@ -27,6 +27,7 @@ const INITIAL_STATUS = {
   activeUpload: null,
   forceSyncActive: false,
   recoveryRequired: [],
+  incompleteCloudImages: [],
 }
 
 export function SyncProvider({ children }) {

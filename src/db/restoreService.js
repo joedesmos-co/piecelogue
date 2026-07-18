@@ -1,7 +1,8 @@
 import { db } from './database'
 import { IMAGE_KINDS } from './artworkImageKeys'
-import { clearImageRecoveryRequired, saveDurableImageBytes } from './artworkImageStorage'
+import { clearImageRecoveryRequired } from './artworkImageStorage'
 import { writeIncomingImageBytes } from './legacyImageMigration'
+import { normalizeArtworkImage } from '../utils/imageNormalize'
 
 export async function getLocalLibraryCounts() {
   const [folderCount, artworkCount] = await Promise.all([
@@ -45,7 +46,17 @@ export async function saveRestoredArtworkImage(artworkId, imageType, blob) {
   }
 
   const kind = imageType === 'thumbnail' ? IMAGE_KINDS.THUMBNAIL : IMAGE_KINDS.ORIGINAL
-  await writeIncomingImageBytes(artworkId, kind, blob)
+  const normalized = await normalizeArtworkImage(blob)
+
+  if (kind === IMAGE_KINDS.ORIGINAL) {
+    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, normalized.original)
+    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
+    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
+    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+    return
+  }
+
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
   await clearImageRecoveryRequired(artworkId, kind)
 }
 
@@ -56,6 +67,6 @@ export async function saveRestoredArtworkImageBytes(artworkId, imageType, bytes,
   }
 
   const kind = imageType === 'thumbnail' ? IMAGE_KINDS.THUMBNAIL : IMAGE_KINDS.ORIGINAL
-  await saveDurableImageBytes(artworkId, kind, bytes, mimeType)
-  await clearImageRecoveryRequired(artworkId, kind)
+  const blob = new Blob([bytes], { type: mimeType || 'image/jpeg' })
+  await saveRestoredArtworkImage(artworkId, kind === IMAGE_KINDS.THUMBNAIL ? 'thumbnail' : 'original', blob)
 }
