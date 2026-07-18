@@ -30,6 +30,7 @@ import {
   tryAcquireForceSyncLock,
 } from '../sync/syncLock'
 import { ApiError } from './api'
+import { verifyCloudSession } from './cloudSession'
 
 const METADATA_BATCH_SIZE = 25
 
@@ -59,6 +60,8 @@ async function buildImageUploadSteps(artworks) {
 }
 
 export async function saveLibraryToCloud({ onProgress, userId } = {}) {
+  await verifyCloudSession()
+
   const lock = tryAcquireForceSyncLock(userId)
   if (!lock) {
     throw new ApiError('Sync already in progress.', 'sync_in_progress', 409)

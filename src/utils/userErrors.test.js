@@ -7,11 +7,11 @@ describe('formatUserError', () => {
   it('maps known API error codes to friendly messages', () => {
     assert.equal(
       formatUserError(new ApiError('Sign in required.', 'unauthorized', 401)),
-      'Sign-in expired. Please sign in again.',
+      'Your session expired. Sign in again.',
     )
     assert.equal(
       formatUserError(new ApiError('Sign in required.', 'unauthorized', 403)),
-      'Please sign in to continue.',
+      'You do not have permission to do that.',
     )
     assert.equal(
       formatUserError(new ApiError('Service down', 'service_unavailable', 503)),
@@ -22,7 +22,7 @@ describe('formatUserError', () => {
   it('hides generic HTTP status messages', () => {
     assert.equal(
       formatUserError(new ApiError('Request failed (500)', null, 500)),
-      'Something went wrong. Please try again.',
+      'Cloud service is temporarily unavailable. Your changes are saved locally.',
     )
   })
 

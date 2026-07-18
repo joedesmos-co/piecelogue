@@ -12,6 +12,7 @@ import {
 import AccountSection from '../components/AccountSection'
 import CloudSaveSection from '../components/CloudSaveSection'
 import AccountDataControlsSection from '../components/AccountDataControlsSection'
+import MobileCloudDiagnostics from '../components/MobileCloudDiagnostics'
 import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
@@ -185,6 +186,8 @@ export default function ProfilePage() {
       <CloudSaveSection authenticated={authenticated} />
 
       <AccountDataControlsSection authenticated={authenticated} />
+
+      {import.meta.env.DEV ? <MobileCloudDiagnostics /> : null}
     </div>
   )
 }

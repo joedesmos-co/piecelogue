@@ -1,8 +1,8 @@
 import { ApiError } from './api.js'
 
 const ERROR_MESSAGES = {
-  unauthorized: 'Please sign in to continue.',
-  sign_in_expired: 'Sign-in expired. Please sign in again.',
+  unauthorized: 'Your session expired. Sign in again.',
+  sign_in_expired: 'Your session expired. Sign in again.',
   timeout: 'Timed out — retry when your connection is stable.',
   cancelled: 'Sync cancelled.',
   sync_in_progress: 'Sync is already running.',
@@ -65,6 +65,18 @@ export function formatUserError(error, fallback = 'Something went wrong. Please 
 
   if (error instanceof ApiError && error.status === 401) {
     return ERROR_MESSAGES.sign_in_expired
+  }
+
+  if (error instanceof ApiError && error.status === 403) {
+    return ERROR_MESSAGES.forbidden
+  }
+
+  if (error instanceof ApiError && error.status === 429) {
+    return ERROR_MESSAGES.rate_limit
+  }
+
+  if (error instanceof ApiError && error.status >= 500) {
+    return ERROR_MESSAGES.service_unavailable
   }
 
   if (error instanceof ApiError && error.code && ERROR_MESSAGES[error.code]) {

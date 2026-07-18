@@ -101,11 +101,24 @@ export function RestoreProvider({ children }) {
             prev.phase === 'checking' ? { ...prev, phase: 'idle' } : prev,
           )
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setRestoreState((prev) =>
-            prev.phase === 'checking' ? { ...prev, phase: 'idle' } : prev,
-          )
+          const isAuthFailure =
+            error?.status === 401 ||
+            error?.status === 403 ||
+            error?.code === 'unauthorized'
+          if (isAuthFailure) {
+            setRestoreState({
+              phase: 'error',
+              progress: null,
+              result: null,
+              error: formatUserError(error, 'Your session expired. Sign in again.'),
+            })
+          } else {
+            setRestoreState((prev) =>
+              prev.phase === 'checking' ? { ...prev, phase: 'idle' } : prev,
+            )
+          }
         }
       }
     }

@@ -92,8 +92,9 @@ async function enforceDestructiveRateLimit(db, userId) {
 }
 
 async function handleDeleteCloudData(request, env) {
-  if (request.method !== 'DELETE') {
-    return withAccountHeaders(methodNotAllowed(['DELETE']))
+  // Accept POST as well as DELETE: iOS Safari / Home Screen can strip DELETE bodies.
+  if (request.method !== 'DELETE' && request.method !== 'POST') {
+    return withAccountHeaders(methodNotAllowed(['DELETE', 'POST']))
   }
 
   const auth = await requireAuthenticatedUser(request, env)
@@ -142,8 +143,9 @@ async function handleDeleteCloudData(request, env) {
 }
 
 async function handleDeleteAccount(request, env) {
-  if (request.method !== 'DELETE') {
-    return withAccountHeaders(methodNotAllowed(['DELETE']))
+  // Accept POST as well as DELETE: iOS Safari / Home Screen can strip DELETE bodies.
+  if (request.method !== 'DELETE' && request.method !== 'POST') {
+    return withAccountHeaders(methodNotAllowed(['DELETE', 'POST']))
   }
 
   const auth = await requireAuthenticatedUser(request, env)

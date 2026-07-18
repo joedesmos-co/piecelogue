@@ -1,4 +1,4 @@
-import { apiFetch } from '../utils/api'
+import { apiFetch } from '../utils/api.js'
 
 export async function fetchMe() {
   const data = await apiFetch('/api/auth/me')

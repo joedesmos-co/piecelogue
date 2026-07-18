@@ -6,7 +6,9 @@ import {
 } from '../constants/accountControls'
 import { deleteAccount, deleteCloudData } from '../api/account'
 import { useAuth } from '../hooks/useAuth'
+import { formatCloudDeleteError } from '../utils/cloudDeleteErrors'
 import { formatUserError } from '../utils/userErrors'
+import { verifyCloudSession } from '../utils/cloudSession'
 
 function ConfirmationField({ id, label, value, onChange, placeholder, disabled }) {
   return (
@@ -49,12 +51,13 @@ export default function AccountDataControlsSection({ authenticated }) {
     setDeletingCloud(true)
 
     try {
+      await verifyCloudSession()
       const result = await deleteCloudData(cloudConfirm.trim())
       setCloudResult(result)
       setCloudConfirm('')
       setShowCloudDelete(false)
     } catch (err) {
-      setCloudError(formatUserError(err, 'Could not delete cloud data.'))
+      setCloudError(formatCloudDeleteError(err))
     } finally {
       setDeletingCloud(false)
     }

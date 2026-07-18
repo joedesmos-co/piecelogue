@@ -9,6 +9,10 @@ import {
   logUploadFailure,
   logUploadStart,
 } from '../sync/uploadDiagnostics.js'
+import {
+  notifyUnauthorized,
+  recordApiRequestDiagnostic,
+} from '../utils/apiDiagnostics.js'
 
 function combineSignals(primary, secondary) {
   if (!primary) {
@@ -28,6 +32,19 @@ function combineSignals(primary, secondary) {
     secondary.addEventListener('abort', abort, { once: true })
   }
   return controller.signal
+}
+
+function recordBinaryResponse(path, method, response, responseData) {
+  return recordApiRequestDiagnostic({
+    path,
+    method,
+    status: response.status,
+    ok: response.ok,
+    wasJson: Boolean(responseData),
+    credentials: 'include',
+    errorCode: responseData?.error?.code ?? null,
+    errorMessage: responseData?.error?.message ?? null,
+  })
 }
 
 export async function uploadBinary(path, body, options = {}) {
@@ -64,7 +81,16 @@ export async function uploadBinary(path, body, options = {}) {
           responseData = await response.json()
         }
 
+        recordBinaryResponse(path, 'PUT', response, responseData)
+
         if (!response.ok) {
+          if (response.status === 401) {
+            notifyUnauthorized({
+              path,
+              method: 'PUT',
+              errorCode: responseData?.error?.code || 'unauthorized',
+            })
+          }
           const message = responseData?.error?.message || `Request failed (${response.status})`
           throw new ApiError(message, responseData?.error?.code, response.status)
         }
@@ -103,8 +129,9 @@ export async function fetchCloudLibrary() {
 }
 
 export async function downloadCloudArtworkImage(artworkId, imageType) {
+  const path = `/api/cloud/artworks/${encodeURIComponent(artworkId)}/${imageType}`
   const response = await fetchWithTimeout(
-    `/api/cloud/artworks/${encodeURIComponent(artworkId)}/${imageType}`,
+    path,
     { credentials: 'include' },
     IMAGE_UPLOAD_TIMEOUT_MS,
   )
@@ -115,10 +142,19 @@ export async function downloadCloudArtworkImage(artworkId, imageType) {
     if (contentType.includes('application/json')) {
       data = await response.json()
     }
+    recordBinaryResponse(path, 'GET', response, data)
+    if (response.status === 401) {
+      notifyUnauthorized({
+        path,
+        method: 'GET',
+        errorCode: data?.error?.code || 'unauthorized',
+      })
+    }
     const message = data?.error?.message || `Image download failed (${response.status})`
     throw new ApiError(message, data?.error?.code, response.status)
   }
 
+  recordBinaryResponse(path, 'GET', response, null)
   return response.blob()
 }
 

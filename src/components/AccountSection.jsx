@@ -8,6 +8,7 @@ import {
   markSignedOutLibraryCleared,
 } from '../utils/clearLocalLibrary'
 import { formatUserError } from '../utils/userErrors'
+import { isStandaloneDisplayMode } from '../utils/apiDiagnostics'
 import ConfirmDialog from './ConfirmDialog'
 import SignInDialog from './SignInDialog'
 import UsernameDialog from './UsernameDialog'
@@ -16,11 +17,12 @@ const GOOGLE_SIGN_IN_URL = '/api/auth/google/start'
 const APPLE_SIGN_IN_URL = '/api/auth/apple/start'
 
 function startGoogleSignIn() {
-  window.location.href = GOOGLE_SIGN_IN_URL
+  // Navigate in-place so Home Screen / standalone keeps the session cookie jar.
+  window.location.assign(GOOGLE_SIGN_IN_URL)
 }
 
 function startAppleSignIn() {
-  window.location.href = APPLE_SIGN_IN_URL
+  window.location.assign(APPLE_SIGN_IN_URL)
 }
 
 function formatHandle(username) {
@@ -151,7 +153,7 @@ export default function AccountSection() {
             </div>
           ) : null}
 
-          {!loading && !error && authenticated && !profileLoading ? (
+          {!loading && authenticated && !profileLoading ? (
             <div className="account-signed-in">
               <div className="account-profile-fields">
                 <p className="settings-text">
@@ -194,11 +196,17 @@ export default function AccountSection() {
             </div>
           ) : null}
 
-          {!loading && !error && !authenticated ? (
+          {!loading && !authenticated ? (
             <div className="account-signed-out">
               <p className="settings-text settings-text--muted">
                 Sign in to sync your library and reserve a username for future sharing.
               </p>
+              {isStandaloneDisplayMode() ? (
+                <p className="settings-text settings-text--muted">
+                  Home Screen mode uses its own sign-in session. Sign in here — a Safari login does
+                  not automatically carry over to the installed app.
+                </p>
+              ) : null}
               <div className="account-sign-in-options">
                 <button
                   type="button"

@@ -63,4 +63,38 @@ describe('account routes authorization', () => {
 
     assert.equal(response.status, 405)
   })
+
+  it('requires sign-in for POST /api/account/cloud-data', async () => {
+    const request = new Request('http://localhost/api/account/cloud-data', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation: 'DELETE CLOUD DATA' }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    const response = await handleAccountRoute(
+      request,
+      createUnauthenticatedEnv(),
+      '/api/account/cloud-data',
+    )
+    const data = await response.json()
+
+    assert.equal(response.status, 401)
+    assert.equal(data.error.code, 'unauthorized')
+  })
+
+  it('accepts POST method for cloud-data (Safari-safe body)', async () => {
+    const request = new Request('http://localhost/api/account/cloud-data', {
+      method: 'POST',
+      body: JSON.stringify({ confirmation: 'wrong' }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    // Still unauthorized first; method itself is allowed (not 405).
+    const response = await handleAccountRoute(
+      request,
+      createUnauthenticatedEnv(),
+      '/api/account/cloud-data',
+    )
+    assert.notEqual(response.status, 405)
+  })
 })

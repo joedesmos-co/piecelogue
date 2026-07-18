@@ -19,6 +19,7 @@ import {
 } from '../sync/restoreLogic'
 import { findIncompleteCloudArtworks } from '../sync/incompleteCloudImages'
 import { setCachedIncompleteCloudImages } from '../sync/reconcileIncompleteCloudImages'
+import { verifyCloudSession } from './cloudSession'
 
 const MAX_IMAGE_DOWNLOAD_CONCURRENCY = 2
 
@@ -38,6 +39,8 @@ async function runWithConcurrency(items, limit, handler) {
 
 export async function restoreLibraryFromCloud({ userId, onProgress } = {}) {
   onProgress?.({ phase: 'checking', message: 'Checking cloud...', current: 0, total: 0 })
+
+  await verifyCloudSession()
 
   const library = await fetchCloudLibrary()
   const folders = library.folders.map(toLocalFolder)
