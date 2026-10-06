@@ -70,6 +70,17 @@ export default function FolderCard({
         }}
         aria-label={`Open folder ${folder.name}, ${folder.count} artwork${folder.count !== 1 ? 's' : ''}`}
       >
+        <div className="folder-card-body">
+          <h3 className="folder-card-title" title={folder.name}>
+            {folder.name}
+          </h3>
+          <p className="folder-card-count">
+            {folder.count} artwork{folder.count !== 1 ? 's' : ''}
+            {folder.childCount > 0
+              ? ` · ${folder.childCount} subfolder${folder.childCount !== 1 ? 's' : ''}`
+              : ''}
+          </p>
+        </div>
         <div className="folder-card-previews" aria-hidden="true">
           {folder.previews?.length > 0 ? (
             folder.previews.map((previewBlobs, index) => (
@@ -85,18 +96,9 @@ export default function FolderCard({
             ))
           ) : (
             <div className="folder-card-preview folder-card-preview--empty">
-              <span>Empty</span>
+              <span>Room for an idea.</span>
             </div>
           )}
-        </div>
-        <div className="folder-card-body">
-          <h3 className="folder-card-title">{folder.name}</h3>
-          <p className="folder-card-count">
-            {folder.count} artwork{folder.count !== 1 ? 's' : ''}
-            {folder.childCount > 0
-              ? ` · ${folder.childCount} subfolder${folder.childCount !== 1 ? 's' : ''}`
-              : ''}
-          </p>
         </div>
       </div>
 

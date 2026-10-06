@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react'
-import { FolderPlus, ImageIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  FolderPlus,
+  LayoutGrid,
+  List,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react'
 import { useArtworks } from '../hooks/useArtworks'
 import { useAuth } from '../hooks/useAuth'
 import { useSync } from '../hooks/useSync'
@@ -12,6 +21,7 @@ import {
   normalizeParentFolderId,
 } from '../utils/folderTree'
 import ArtworkCard from '../components/ArtworkCard'
+import { BrushMark } from '../components/StudioMarks'
 import ArtworkDetail from '../components/ArtworkDetail'
 import EmptyState from '../components/EmptyState'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -42,6 +52,8 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const { retryNow, wakeSync } = useSync()
 
   const [view, setView] = useState(GALLERY_VIEWS.HOME)
+  const [search, setSearch] = useState('')
+  const [layout, setLayout] = useState('grid')
   const [selectedFolderId, setSelectedFolderId] = useState(null)
   const [selectedArtwork, setSelectedArtwork] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -62,10 +74,13 @@ export default function GalleryPage({ onAdd, onEdit }) {
     [artworks],
   )
 
-  const selectedFolder = folders.find((folder) => folder.id === selectedFolderId) || null
-  const currentFolderId = view === GALLERY_VIEWS.FOLDER ? selectedFolderId : null
+  const selectedFolder =
+    folders.find((folder) => folder.id === selectedFolderId) || null
+  const currentFolderId =
+    view === GALLERY_VIEWS.FOLDER ? selectedFolderId : null
   const breadcrumbs = useMemo(
-    () => (selectedFolderId ? getFolderBreadcrumbs(selectedFolderId, folders) : []),
+    () =>
+      selectedFolderId ? getFolderBreadcrumbs(selectedFolderId, folders) : [],
     [selectedFolderId, folders],
   )
 
@@ -79,7 +94,9 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const visibleArtworks = useMemo(() => {
     switch (view) {
       case GALLERY_VIEWS.FOLDER:
-        return artworks.filter((artwork) => artwork.folderId === selectedFolderId)
+        return artworks.filter(
+          (artwork) => artwork.folderId === selectedFolderId,
+        )
       case GALLERY_VIEWS.UNFILED:
         return unfiledArtworks
       case GALLERY_VIEWS.HOME:
@@ -88,9 +105,23 @@ export default function GalleryPage({ onAdd, onEdit }) {
     }
   }, [view, artworks, selectedFolderId, unfiledArtworks])
 
+  const matchingArtworks = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    return query
+      ? visibleArtworks.filter((artwork) =>
+          [
+            artwork.title,
+            artwork.medium,
+            artwork.mediumType,
+            artwork.status,
+          ].some((value) => value?.toLocaleLowerCase().includes(query)),
+        )
+      : visibleArtworks
+  }, [visibleArtworks, search])
+
   const createParentFolderId =
     folderDialog?.mode === 'create'
-      ? folderDialog.parentFolderId ?? currentFolderId
+      ? (folderDialog.parentFolderId ?? currentFolderId)
       : null
 
   const renameParentOptions = useMemo(() => {
@@ -137,7 +168,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
   }
 
   function handleGalleryContextMenu(event) {
-    if (event.target.closest('.folder-card, .artwork-card, .gallery-toolbar, button, a, input, select, textarea')) {
+    if (
+      event.target.closest(
+        '.folder-card, .artwork-card, .gallery-toolbar, button, a, input, select, textarea',
+      )
+    ) {
       return
     }
 
@@ -180,7 +215,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
     setDragArtworkId(null)
     setDropFolderId(null)
 
-    if (meta.cancelled || !targetFolderId || targetFolderId === artwork.folderId) {
+    if (
+      meta.cancelled ||
+      !targetFolderId ||
+      targetFolderId === artwork.folderId
+    ) {
       return
     }
 
@@ -239,7 +278,9 @@ export default function GalleryPage({ onAdd, onEdit }) {
     try {
       await removeFolder(deleteFolderTarget.id, { moveContentsTo })
       if (selectedFolderId === deleteFolderTarget.id) {
-        const parentId = normalizeParentFolderId(deleteFolderTarget.parentFolderId)
+        const parentId = normalizeParentFolderId(
+          deleteFolderTarget.parentFolderId,
+        )
         if (parentId) {
           openFolder(parentId)
         } else {
@@ -256,7 +297,8 @@ export default function GalleryPage({ onAdd, onEdit }) {
 
   if (selectedArtwork) {
     const current =
-      artworks.find((artwork) => artwork.id === selectedArtwork.id) || selectedArtwork
+      artworks.find((artwork) => artwork.id === selectedArtwork.id) ||
+      selectedArtwork
 
     return (
       <>
@@ -296,54 +338,84 @@ export default function GalleryPage({ onAdd, onEdit }) {
         ? 'Unfiled'
         : 'Gallery'
 
-  const showFolderSection = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.FOLDER
-  const showUnfiledHeading = view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.UNFILED
+  const showFolderSection =
+    view === GALLERY_VIEWS.HOME || view === GALLERY_VIEWS.FOLDER
   const hasAnyArtwork = artworks.length > 0
 
   return (
-    <div
-      className="page gallery-page"
-      onContextMenu={handleGalleryContextMenu}
-    >
+    <div className="page gallery-page" onContextMenu={handleGalleryContextMenu}>
       <header className="page-header gallery-header">
         <div className="gallery-header-main">
           {view === GALLERY_VIEWS.FOLDER ? (
-            <GalleryBreadcrumbs crumbs={breadcrumbs} onNavigate={handleBreadcrumbNavigate} />
+            <GalleryBreadcrumbs
+              crumbs={breadcrumbs}
+              onNavigate={handleBreadcrumbNavigate}
+            />
           ) : null}
-          <div>
-            <h2 className="page-title">{pageTitle}</h2>
-            {!loading && visibleArtworks.length > 0 && view !== GALLERY_VIEWS.HOME && (
-              <p className="page-subtitle">
-                {visibleArtworks.length} artwork{visibleArtworks.length !== 1 ? 's' : ''}
+          {view === GALLERY_VIEWS.UNFILED && (
+            <button type="button" className="gallery-back" onClick={goHome}>
+              <ArrowLeft size={16} aria-hidden="true" /> Back to Gallery
+            </button>
+          )}
+          <div
+            className={`gallery-heading-composition ${view === GALLERY_VIEWS.FOLDER ? 'gallery-heading-composition--folder' : ''}`}
+          >
+            <div className="gallery-heading-ink">
+              <h1 className="gallery-title">{pageTitle}</h1>
+              <BrushMark className="gallery-title-stroke" />
+            </div>
+            {view === GALLERY_VIEWS.HOME && (
+              <p className="gallery-handwritten-note">
+                Your work,
+                <br />
+                <span>all in one place.</span>
+                <ArrowUpRight size={24} aria-hidden="true" />
               </p>
             )}
           </div>
         </div>
 
         <div className="gallery-toolbar">
-          {view !== GALLERY_VIEWS.UNFILED && view !== GALLERY_VIEWS.FOLDER && unfiledArtworks.length > 0 && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={showUnfiled}>
-              Unfiled ({unfiledArtworks.length})
-            </button>
-          )}
+          <label className="gallery-search">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Search artworks in this view"
+              placeholder="Search artworks…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear artwork search"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </label>
           <button
             type="button"
-            className="btn btn--secondary btn--sm"
+            className="btn btn--secondary btn--sm gallery-new-folder"
             onClick={() =>
-              setFolderDialog({ mode: 'create', parentFolderId: currentFolderId })
+              setFolderDialog({
+                mode: 'create',
+                parentFolderId: currentFolderId,
+              })
             }
             aria-label="Create new folder"
           >
-            <FolderPlus size={16} />
+            <FolderPlus size={18} aria-hidden="true" />
             {view === GALLERY_VIEWS.FOLDER ? 'New Subfolder' : 'New Folder'}
           </button>
           {view === GALLERY_VIEWS.FOLDER && (
             <button
               type="button"
-              className="btn btn--primary btn--sm"
+              className="btn btn--primary btn--sm gallery-add-to-folder"
               onClick={() => onAdd(currentFolderId)}
             >
-              Add Artwork
+              <Plus size={18} aria-hidden="true" /> Add Artwork
             </button>
           )}
         </div>
@@ -362,84 +434,127 @@ export default function GalleryPage({ onAdd, onEdit }) {
           {showFolderSection && (
             <section className="gallery-folders" aria-label="Folders">
               <div className="gallery-section-header">
-                <h3 className="gallery-section-title">
-                  {view === GALLERY_VIEWS.FOLDER ? 'Subfolders' : 'Folders'}
-                </h3>
+                <div className="gallery-section-label">
+                  <h2 className="gallery-section-title">
+                    {view === GALLERY_VIEWS.FOLDER ? 'Subfolders' : 'Folders'}
+                  </h2>
+                  <span className="gallery-section-count">
+                    {visibleChildFolders.length}
+                  </span>
+                </div>
               </div>
-
-              {visibleChildFolders.length === 0 ? (
-                <div className="gallery-folders-empty">
-                  <p>
+              <div className="folder-grid">
+                {visibleChildFolders.map((folder) => (
+                  <FolderCard
+                    key={folder.id}
+                    folder={folder}
+                    onOpen={openFolder}
+                    onRename={(item) =>
+                      setFolderDialog({ mode: 'rename', folder: item })
+                    }
+                    onDelete={setDeleteFolderTarget}
+                    onNewSubfolder={(item) =>
+                      setFolderDialog({
+                        mode: 'create',
+                        parentFolderId: item.id,
+                      })
+                    }
+                    onMoveFolder={(item) =>
+                      setFolderDialog({ mode: 'rename', folder: item })
+                    }
+                    isDropTarget={Boolean(dragArtworkId)}
+                    dropTargetActive={dropFolderId === folder.id}
+                    onDropArtwork={(folderId) => {
+                      const artwork = artworks.find(
+                        (item) => item.id === dragArtworkId,
+                      )
+                      if (artwork) {
+                        handleMoveArtworkToFolder(artwork, folderId)
+                      }
+                      setDragArtworkId(null)
+                      setDropFolderId(null)
+                    }}
+                  />
+                ))}
+                <button
+                  type="button"
+                  className="folder-create-card"
+                  onClick={() =>
+                    setFolderDialog({
+                      mode: 'create',
+                      parentFolderId: currentFolderId,
+                    })
+                  }
+                >
+                  <Plus size={28} strokeWidth={1.4} aria-hidden="true" />
+                  <span>
                     {view === GALLERY_VIEWS.FOLDER
-                      ? 'No subfolders yet.'
-                      : 'No folders yet. Create one to organize your artwork.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="folder-grid">
-                  {visibleChildFolders.map((folder) => (
-                    <FolderCard
-                      key={folder.id}
-                      folder={folder}
-                      onOpen={openFolder}
-                      onRename={(item) => setFolderDialog({ mode: 'rename', folder: item })}
-                      onDelete={setDeleteFolderTarget}
-                      onNewSubfolder={(item) =>
-                        setFolderDialog({ mode: 'create', parentFolderId: item.id })
-                      }
-                      onMoveFolder={(item) =>
-                        setFolderDialog({ mode: 'rename', folder: item })
-                      }
-                      isDropTarget={Boolean(dragArtworkId)}
-                      dropTargetActive={dropFolderId === folder.id}
-                      onDropArtwork={(folderId) => {
-                        const artwork = artworks.find((item) => item.id === dragArtworkId)
-                        if (artwork) {
-                          handleMoveArtworkToFolder(artwork, folderId)
-                        }
-                        setDragArtworkId(null)
-                        setDropFolderId(null)
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+                      ? 'New subfolder'
+                      : 'New folder'}
+                  </span>
+                </button>
+              </div>
             </section>
           )}
 
           <section className="gallery-artworks" aria-label="Artwork">
-            {showUnfiledHeading && (
-              <div className="gallery-section-header">
-                <h3 className="gallery-section-title">
-                  {view === GALLERY_VIEWS.UNFILED ? 'Unfiled Artwork' : 'Unfiled'}
-                </h3>
-                {view === GALLERY_VIEWS.HOME && unfiledArtworks.length > 0 && (
-                  <button type="button" className="btn btn--ghost btn--sm" onClick={showUnfiled}>
-                    View all unfiled
+            <div className="gallery-section-header">
+              <div className="gallery-section-label">
+                <h2 className="gallery-section-title">
+                  {view === GALLERY_VIEWS.UNFILED
+                    ? 'Unfiled artwork'
+                    : 'Artworks'}
+                </h2>
+                <span className="gallery-section-count" aria-live="polite">
+                  {matchingArtworks.length}
+                </span>
+                {view === GALLERY_VIEWS.HOME && (
+                  <button
+                    type="button"
+                    className="gallery-scope-label"
+                    onClick={showUnfiled}
+                    aria-label="View all unfiled artwork"
+                  >
+                    Unfiled <ArrowUpRight size={12} aria-hidden="true" />
                   </button>
                 )}
               </div>
-            )}
+              <div className="gallery-view-controls">
+                <div
+                  className="gallery-layout-toggle"
+                  role="group"
+                  aria-label="Artwork layout"
+                >
+                  <button
+                    type="button"
+                    aria-label="Grid view"
+                    aria-pressed={layout === 'grid'}
+                    onClick={() => setLayout('grid')}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="List view"
+                    aria-pressed={layout === 'list'}
+                    onClick={() => setLayout('list')}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {visibleArtworks.length === 0 ? (
               view === GALLERY_VIEWS.FOLDER ? (
                 visibleChildFolders.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-state-icon" aria-hidden="true">
-                      <ImageIcon size={40} strokeWidth={1.5} />
-                    </div>
-                    <h2 className="empty-state-title">This folder is empty</h2>
-                    <p className="empty-state-text">
-                      Add artwork to &ldquo;{selectedFolder?.name}&rdquo; or create a subfolder.
-                    </p>
-                    <button
-                      type="button"
-                      className="btn btn--primary"
-                      onClick={() => onAdd(currentFolderId)}
-                    >
-                      Add artwork to folder
-                    </button>
-                  </div>
+                  <EmptyState
+                    title="Room for something good."
+                    message={`Add artwork to “${selectedFolder?.name}” or create a subfolder.`}
+                    note="Keep the ideas together."
+                    actionLabel="Add artwork to folder"
+                    onAdd={() => onAdd(currentFolderId)}
+                  />
                 ) : null
               ) : view === GALLERY_VIEWS.HOME && !hasAnyArtwork ? (
                 <EmptyState
@@ -447,28 +562,38 @@ export default function GalleryPage({ onAdd, onEdit }) {
                   signedOut={!authenticated && wasLibraryClearedOnSignOut()}
                 />
               ) : (
-                <div className="empty-state">
-                  <div className="empty-state-icon" aria-hidden="true">
-                    <ImageIcon size={40} strokeWidth={1.5} />
-                  </div>
-                  <h2 className="empty-state-title">
-                    {view === GALLERY_VIEWS.UNFILED ? 'No unfiled artwork' : 'No unfiled artwork here'}
-                  </h2>
-                  <p className="empty-state-text">
-                    {view === GALLERY_VIEWS.UNFILED
+                <EmptyState
+                  title="Everything in its place."
+                  message={
+                    view === GALLERY_VIEWS.UNFILED
                       ? 'Pieces without a folder appear here. Add artwork from the Gallery or move items out of folders.'
-                      : 'Artwork stored in folders does not appear here. Open a folder to view it, or add new unfiled work.'}
-                  </p>
-                  {view === GALLERY_VIEWS.UNFILED ? (
-                    <button type="button" className="btn btn--primary" onClick={() => onAdd(null)}>
-                      Add unfiled artwork
-                    </button>
-                  ) : null}
-                </div>
+                      : 'Your artwork is tucked into folders. Open one above to see your work, or add a new unfiled piece.'
+                  }
+                  note="Your collection is taking shape."
+                  actionLabel="Add unfiled artwork"
+                  onAdd={
+                    view === GALLERY_VIEWS.UNFILED
+                      ? () => onAdd(null)
+                      : undefined
+                  }
+                />
               )
+            ) : matchingArtworks.length === 0 ? (
+              <div className="gallery-no-results" role="status">
+                <p>No pieces match “{search}”.</p>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setSearch('')}
+                >
+                  Clear search
+                </button>
+              </div>
             ) : (
-              <div className="artwork-grid">
-                {visibleArtworks.map((artwork) => (
+              <div
+                className={`artwork-grid ${layout === 'list' ? 'artwork-grid--list' : ''}`}
+              >
+                {matchingArtworks.map((artwork) => (
                   <ArtworkCard
                     key={artwork.id}
                     artwork={artwork}

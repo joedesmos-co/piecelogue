@@ -1,6 +1,7 @@
 import { Images, User, Settings, Plus } from 'lucide-react'
 import { APP_NAME, PAGES } from '../utils/constants'
 import { navigate } from '../utils/navigation'
+import { BrushMark, SketchArrow } from './StudioMarks'
 
 const NAV_ITEMS = [
   { id: PAGES.GALLERY, label: 'Gallery', icon: Images },
@@ -37,8 +38,16 @@ export function Sidebar({ currentPage, onNavigate, onAdd }) {
           onClick={() => navigate('/')}
           aria-label={`${APP_NAME} home`}
         >
-          {APP_NAME}
+          <span className="brand-wordmark">{APP_NAME}</span>
+          <BrushMark className="brand-underline" />
         </button>
+        <p className="sidebar-tagline">
+          Your work.
+          <br />
+          Your story.
+          <br />
+          All in one place.
+        </p>
       </div>
 
       <nav className="sidebar-nav">
@@ -56,10 +65,29 @@ export function Sidebar({ currentPage, onNavigate, onAdd }) {
         ))}
       </nav>
 
-      <button type="button" className="sidebar-add btn btn--primary" onClick={onAdd}>
-        <Plus size={18} />
-        Add Artwork
-      </button>
+      <div className="sidebar-studio-note" aria-hidden="true">
+        Create
+        <br />
+        Log
+        <br />
+        Organize
+        <br />
+        Repeat.
+        <SketchArrow />
+      </div>
+      <div className="sidebar-create">
+        <button type="button" className="sidebar-add" onClick={onAdd}>
+          <Plus size={36} strokeWidth={2} aria-hidden="true" />
+          <span>
+            Add
+            <br />
+            Artwork
+          </span>
+        </button>
+        <span className="sidebar-edition" aria-hidden="true">
+          A space for the work you make.
+        </span>
+      </div>
     </aside>
   )
 }

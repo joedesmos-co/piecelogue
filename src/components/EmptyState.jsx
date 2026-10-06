@@ -1,39 +1,48 @@
-import { Palette, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { SketchArrow } from './StudioMarks'
 
-export default function EmptyState({ onAdd, signedOut = false }) {
-  if (signedOut) {
-    return (
-      <div className="empty-state">
-        <div className="empty-state-icon" aria-hidden="true">
-          <Palette size={40} strokeWidth={1.5} />
-        </div>
-        <h2 className="empty-state-title">Sign in to see your library</h2>
-        <p className="empty-state-text">
-          Your local library on this device was cleared when you signed out. Sign in on Profile to
-          restore from cloud, or add artwork to start a new local collection.
-        </p>
-        <button type="button" className="btn btn--primary" onClick={onAdd}>
-          <Plus size={18} aria-hidden="true" />
-          Add artwork
-        </button>
-      </div>
-    )
-  }
+export default function EmptyState({
+  onAdd,
+  signedOut = false,
+  title,
+  message,
+  actionLabel = 'Add your first artwork',
+  note = 'Every collection starts with one piece.',
+}) {
+  const heading =
+    title ||
+    (signedOut ? 'Sign in to see your library.' : 'Make your first mark.')
+  const description =
+    message ||
+    (signedOut
+      ? 'Your local library on this device was cleared when you signed out. Sign in on Profile to restore from cloud, or add artwork to start a new local collection.'
+      : 'A sketch, a finished piece, an experiment. Start with something you made. This is your wall.')
 
   return (
-    <div className="empty-state">
-      <div className="empty-state-icon" aria-hidden="true">
-        <Palette size={40} strokeWidth={1.5} />
+    <div className="studio-empty">
+      <div className="studio-empty-poster">
+        <span className="studio-empty-kicker">
+          Piecelogue / your growing collection
+        </span>
+        <div className="studio-empty-frame">
+          <h3>{heading}</h3>
+        </div>
+        <div className="studio-empty-caption">
+          <span aria-hidden="true">[ a work in becoming ]</span>
+          <span aria-hidden="true">Your studio</span>
+        </div>
+        {onAdd && (
+          <button type="button" className="studio-empty-add" onClick={onAdd}>
+            <Plus size={24} aria-hidden="true" />
+            {signedOut ? 'Add artwork' : actionLabel}
+          </button>
+        )}
       </div>
-      <h2 className="empty-state-title">Your gallery is empty</h2>
-      <p className="empty-state-text">
-        Add your first artwork to start logging your creative journey. You can organize pieces into
-        folders later, and sign in on Profile when you are ready for cloud backup.
-      </p>
-      <button type="button" className="btn btn--primary" onClick={onAdd}>
-        <Plus size={18} aria-hidden="true" />
-        Add your first artwork
-      </button>
+      <div className="studio-empty-note">
+        <p className="studio-empty-handwriting">{note}</p>
+        <SketchArrow className="studio-empty-arrow" />
+        <p className="studio-empty-description">{description}</p>
+      </div>
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { Heart, Clock, Folder, MoreHorizontal } from 'lucide-react'
+import { Star, Clock, Folder, MoreHorizontal } from 'lucide-react'
 import { formatTime } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getFolderPathLabel } from '../utils/folderTree'
@@ -16,7 +16,9 @@ export default function ArtworkCard({
   isDragging = false,
   isDragSource = false,
 }) {
-  const folderName = artwork.folderId ? getFolderPathLabel(artwork.folderId, folders) : null
+  const folderName = artwork.folderId
+    ? getFolderPathLabel(artwork.folderId, folders)
+    : null
 
   const { longPressHandlers } = useLongPress({
     onPress: () => onClick?.(artwork),
@@ -41,11 +43,15 @@ export default function ArtworkCard({
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           onClick?.(artwork)
         }
-        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+        if (
+          event.key === 'ContextMenu' ||
+          (event.shiftKey && event.key === 'F10')
+        ) {
           event.preventDefault()
           onOpenActions?.(artwork)
         }
@@ -64,13 +70,15 @@ export default function ArtworkCard({
         />
         {artwork.favorite && (
           <span className="artwork-card-favorite" aria-hidden="true">
-            <Heart size={14} fill="currentColor" />
+            <Star size={18} fill="currentColor" />
           </span>
         )}
       </div>
       <div className="artwork-card-body">
         <div className="artwork-card-title-row">
-          <h3 className="artwork-card-title">{artwork.title}</h3>
+          <h3 className="artwork-card-title" title={artwork.title}>
+            {artwork.title}
+          </h3>
           <button
             type="button"
             className="icon-btn artwork-card-menu-btn"
@@ -85,7 +93,22 @@ export default function ArtworkCard({
           </button>
         </div>
         <div className="artwork-card-meta">
-          <span className="badge badge--medium-type">{resolveMediumType(artwork)}</span>
+          <span className="badge badge--medium-type">
+            {resolveMediumType(artwork)}
+          </span>
+          {artwork.totalMinutes > 0 && (
+            <span className="artwork-card-time">
+              <Clock size={12} aria-hidden="true" />
+              {formatTime(artwork.totalMinutes)}
+            </span>
+          )}
+        </div>
+        <div className="artwork-card-details">
+          {artwork.medium && (
+            <span className="artwork-card-detail" title={artwork.medium}>
+              {artwork.medium}
+            </span>
+          )}
           {artwork.status && (
             <span
               className={`badge badge--status badge--${artwork.status === 'Finished' ? 'finished' : 'progress'}`}
@@ -93,21 +116,10 @@ export default function ArtworkCard({
               {artwork.status}
             </span>
           )}
-        </div>
-        <div className="artwork-card-details">
-          {artwork.medium && (
-            <span className="artwork-card-detail">{artwork.medium}</span>
-          )}
           {folderName && (
             <span className="artwork-card-detail artwork-card-folder">
               <Folder size={12} aria-hidden="true" />
               {folderName}
-            </span>
-          )}
-          {(artwork.totalMinutes > 0) && (
-            <span className="artwork-card-time">
-              <Clock size={12} aria-hidden="true" />
-              {formatTime(artwork.totalMinutes)}
             </span>
           )}
         </div>

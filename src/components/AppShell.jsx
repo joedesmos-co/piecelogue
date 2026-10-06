@@ -1,15 +1,11 @@
 import { Plus } from 'lucide-react'
-import { APP_NAME, APP_TAGLINE } from '../utils/constants'
+import { APP_NAME } from '../utils/constants'
 import { navigate } from '../utils/navigation'
 import { BottomNav, Sidebar } from './Navigation'
 import SiteFooter from './SiteFooter'
+import { BrushMark } from './StudioMarks'
 
-export default function AppShell({
-  currentPage,
-  onNavigate,
-  onAdd,
-  children,
-}) {
+export default function AppShell({ currentPage, onNavigate, onAdd, children }) {
   return (
     <div className="app-shell">
       <Sidebar
@@ -26,17 +22,14 @@ export default function AppShell({
             onClick={() => navigate('/')}
             aria-label={`${APP_NAME} home`}
           >
-            <h1 className="mobile-header-title">{APP_NAME}</h1>
-            <p className="mobile-header-tagline">{APP_TAGLINE}</p>
+            <span className="brand-wordmark">{APP_NAME}</span>
+            <BrushMark className="brand-underline" />
           </button>
-          <button
-            type="button"
-            className="mobile-header-add"
-            onClick={onAdd}
-            aria-label="Add artwork"
-          >
-            <Plus size={22} />
-          </button>
+          <p className="mobile-header-tagline">
+            Your work.
+            <br />
+            Your story.
+          </p>
         </header>
 
         <main className="app-content">
@@ -44,10 +37,7 @@ export default function AppShell({
           <SiteFooter />
         </main>
 
-        <BottomNav
-          currentPage={currentPage}
-          onNavigate={onNavigate}
-        />
+        <BottomNav currentPage={currentPage} onNavigate={onNavigate} />
 
         <button
           type="button"
@@ -56,6 +46,7 @@ export default function AppShell({
           aria-label="Add artwork"
         >
           <Plus size={26} strokeWidth={2.5} />
+          <span>Add artwork</span>
         </button>
       </div>
     </div>
