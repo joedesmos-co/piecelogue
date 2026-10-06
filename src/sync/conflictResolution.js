@@ -1,4 +1,8 @@
-import { downloadCloudArtworkImage, uploadCloudArtworks, uploadCloudFolders } from '../api/cloud.js'
+import {
+  downloadCloudArtworkImage,
+  uploadCloudArtworks,
+  uploadCloudFolders,
+} from '../api/cloud.js'
 import { db } from '../db/database.js'
 import {
   saveRestoredArtworkImage,
@@ -6,11 +10,28 @@ import {
   upsertRestoredFolders,
 } from '../db/restoreService.js'
 import { removeSyncConflict } from '../db/syncConflictService.js'
-import { removeSyncJob } from '../db/syncQueueService.js'
+import { enqueueSyncJob, removeSyncJob } from '../db/syncQueueService.js'
 import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevisionService.js'
 import { setImageHashes } from '../db/syncImageHashService.js'
 import { toCloudArtworkMetadata, toCloudFolder } from './cloudPayload.js'
 import { SYNC_ENTITY_TYPES } from './constants.js'
+import { notifyWake } from './enqueue.js'
+import * as artworkService from '../db/artworkService.js'
+import * as folderService from '../db/folderService.js'
+
+const cloudApi = { uploadCloudArtworks, uploadCloudFolders, downloadCloudArtworkImage }
+
+export const CONFLICT_REASON = {
+  REMOTE_DELETED: 'remote_deleted',
+  REMOTE_DELETED_LOCAL_CHANGED: 'remote_deleted_local_changed',
+}
+
+export function isRemoteDeletedConflict(conflict) {
+  return (
+    conflict?.reason === CONFLICT_REASON.REMOTE_DELETED ||
+    conflict?.reason === CONFLICT_REASON.REMOTE_DELETED_LOCAL_CHANGED
+  )
+}
 import { IMAGE_KINDS } from '../db/artworkImageKeys.js'
 import { readArtworkImageBytes } from '../db/artworkImageReader.js'
 import { hashBytes } from './imageHash.js'
@@ -46,7 +67,13 @@ async function downloadCloudArtworkImages(userId, artworkId, cloud) {
   }
 }
 
-export async function resolveKeepLocal(conflict) {
+/**
+ * Resolve a conflict by keeping the local version.
+ *
+ * @param conflict  the stored conflict record
+ * @param options.cloud  optional cloud client override (tests only)
+ */
+export async function resolveKeepLocal(conflict, { cloud = cloudApi } = {}) {
   const { userId, entityType, entityId, jobId } = conflict
 
   if (entityType === SYNC_ENTITY_TYPES.FOLDER) {
@@ -55,7 +82,7 @@ export async function resolveKeepLocal(conflict) {
       throw new Error('Local folder not found.')
     }
 
-    const response = await uploadCloudFolders([toCloudFolder(folder, { force: true })])
+    const response = await cloud.uploadCloudFolders([toCloudFolder(folder, { force: true })])
     const revision = extractUpsertRevision(response, entityId)
     if (revision) {
       await setFolderCloudRevision(entityId, revision)
@@ -66,7 +93,9 @@ export async function resolveKeepLocal(conflict) {
       throw new Error('Local artwork not found.')
     }
 
-    const response = await uploadCloudArtworks([toCloudArtworkMetadata(artwork, { force: true })])
+    const response = await cloud.uploadCloudArtworks([
+      toCloudArtworkMetadata(artwork, { force: true }),
+    ])
     const revision = extractUpsertRevision(response, entityId)
     if (revision) {
       await setArtworkCloudRevision(entityId, revision)
@@ -79,6 +108,109 @@ export async function resolveKeepLocal(conflict) {
   if (jobId) {
     await removeSyncJob(jobId)
   }
+}
+
+/**
+ * "Keep Deleted" for a remote_deleted conflict.
+ *
+ * The user explicitly accepted the remote deletion, so the local copy is
+ * removed through the normal local deletion path (which also removes its
+ * durable image bytes). This is the only path besides a normal user delete
+ * that is allowed to drop local image bytes.
+ */
+export async function resolveKeepDeleted(conflict) {
+  const { userId, entityType, entityId, jobId } = conflict
+
+  if (entityType === SYNC_ENTITY_TYPES.FOLDER) {
+    const folder = await db.folders.get(entityId)
+    if (folder) {
+      // Pass through folderService so child-folder and artwork folderId
+      // bookkeeping stays identical to a user-initiated delete. Artworks are
+      // moved to root, never deleted: this matches existing Piecelogue
+      // behaviour and avoids cascading a remote folder delete into artwork.
+      await folderService.deleteFolder(entityId, { moveContentsTo: 'root' })
+    }
+  } else if (entityType === SYNC_ENTITY_TYPES.ARTWORK) {
+    const artwork = await db.artworks.get(entityId)
+    if (artwork) {
+      await artworkService.deleteArtwork(entityId)
+    }
+  } else {
+    throw new Error('Unsupported conflict type.')
+  }
+
+  await removeSyncConflict(userId, entityType, entityId)
+  if (jobId) {
+    await removeSyncJob(jobId)
+  }
+}
+
+/**
+ * "Restore Artwork"/"Restore Folder" for a remote_deleted conflict.
+ *
+ * An intentional, user-authorized resurrection: push the local copy with
+ * allowResurrect so the next push deliberately replaces the remote tombstone,
+ * then queue images so R2 gets them again.
+ */
+export async function resolveRestoreDeleted(conflict, { cloud = cloudApi } = {}) {
+  const { userId, entityType, entityId, jobId } = conflict
+
+  if (entityType === SYNC_ENTITY_TYPES.FOLDER) {
+    const folder = await db.folders.get(entityId)
+    if (!folder) {
+      throw new Error('Local folder not found.')
+    }
+
+    const response = await cloud.uploadCloudFolders([
+      toCloudFolder(folder, { force: true, allowResurrect: true }),
+    ])
+    const revision = extractUpsertRevision(response, entityId)
+    if (revision) {
+      await setFolderCloudRevision(entityId, revision)
+    }
+
+    await removeSyncConflict(userId, entityType, entityId)
+    if (jobId) {
+      await removeSyncJob(jobId)
+    }
+    // Queue against the conflict's own userId rather than module-scoped active
+    // user, so resolution works even if the active-user scope has moved on.
+    if (userId) {
+      await enqueueSyncJob(userId, SYNC_ENTITY_TYPES.FOLDER, entityId)
+    }
+    notifyWake()
+    return
+  }
+
+  if (entityType === SYNC_ENTITY_TYPES.ARTWORK) {
+    const artwork = await db.artworks.get(entityId)
+    if (!artwork) {
+      throw new Error('Local artwork not found.')
+    }
+
+    const response = await cloud.uploadCloudArtworks([
+      toCloudArtworkMetadata(artwork, { force: true, allowResurrect: true }),
+    ])
+    const revision = extractUpsertRevision(response, entityId)
+    if (revision) {
+      await setArtworkCloudRevision(entityId, revision)
+    }
+
+    await removeSyncConflict(userId, entityType, entityId)
+    if (jobId) {
+      await removeSyncJob(jobId)
+    }
+    // Queue metadata + images so the R2 objects are recreated, using the
+    // conflict's userId rather than module-scoped active user.
+    if (userId) {
+      await enqueueSyncJob(userId, SYNC_ENTITY_TYPES.ARTWORK, entityId)
+      await enqueueSyncJob(userId, SYNC_ENTITY_TYPES.ARTWORK_IMAGE, entityId)
+    }
+    notifyWake()
+    return
+  }
+
+  throw new Error('Unsupported conflict type.')
 }
 
 export async function resolveKeepCloud(conflict) {

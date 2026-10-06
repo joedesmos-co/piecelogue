@@ -9,6 +9,8 @@ import {
   enqueueFolderDeleteSync,
   enqueueFolderSync,
 } from '../sync/enqueue'
+import { notifyLocalChange } from '../sync/autoSync'
+import { onCloudDataChanged } from '../sync/cloudDataEvents'
 
 export function ArtworkProvider({ children }) {
   const [artworks, setArtworks] = useState([])
@@ -59,10 +61,17 @@ export function ArtworkProvider({ children }) {
     }
   }, [])
 
+  // Re-read from Dexie when an automatic cloud merge changed local data.
+  useEffect(() => onCloudDataChanged(() => refresh()), [refresh])
+
+  // Every mutation below follows the same shape: persist locally first, queue the
+  // sync job, then notify the coordinator so the cloud updates automatically.
+  // The UI never waits on the network.
   const addArtwork = useCallback(async (data, imageBlob) => {
     const artwork = await artworkService.createArtwork(data, imageBlob)
     await enqueueArtworkSync(artwork.id)
     await refresh()
+    notifyLocalChange()
     return artwork
   }, [refresh])
 
@@ -70,6 +79,7 @@ export function ArtworkProvider({ children }) {
     const artwork = await artworkService.updateArtwork(id, data, imageBlob)
     await enqueueArtworkSync(id, { includeImage: Boolean(imageBlob) })
     await refresh()
+    notifyLocalChange()
     return artwork
   }, [refresh])
 
@@ -77,12 +87,14 @@ export function ArtworkProvider({ children }) {
     await artworkService.deleteArtwork(id)
     await enqueueArtworkDeleteSync(id)
     await refresh()
+    notifyLocalChange()
   }, [refresh])
 
   const toggleFavorite = useCallback(async (id) => {
     const artwork = await artworkService.toggleFavorite(id)
     await enqueueArtworkMetadataSync(id)
     await refresh()
+    notifyLocalChange()
     return artwork
   }, [refresh])
 
@@ -90,6 +102,7 @@ export function ArtworkProvider({ children }) {
     const folder = await folderService.createFolder(name, parentFolderId)
     await enqueueFolderSync(folder.id)
     await refresh()
+    notifyLocalChange()
     return folder
   }, [refresh])
 
@@ -97,6 +110,7 @@ export function ArtworkProvider({ children }) {
     const folder = await folderService.updateFolder(id, { name, parentFolderId })
     await enqueueFolderSync(id)
     await refresh()
+    notifyLocalChange()
     return folder
   }, [refresh])
 
@@ -104,6 +118,7 @@ export function ArtworkProvider({ children }) {
     const artwork = await artworkService.moveArtworkToFolder(id, folderId)
     await enqueueArtworkMetadataSync(id)
     await refresh()
+    notifyLocalChange()
     return artwork
   }, [refresh])
 
@@ -115,6 +130,7 @@ export function ArtworkProvider({ children }) {
       await enqueueArtworkMetadataSync(artwork.id)
     }
     await refresh()
+    notifyLocalChange()
     return folder
   }, [refresh])
 

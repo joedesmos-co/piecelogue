@@ -17,7 +17,22 @@ export function getCloudRevision(row) {
   return Math.floor(revision)
 }
 
-export function evaluateRevisionConflict(existing, baseRevision, { force = false } = {}) {
+export function evaluateRevisionConflict(
+  existing,
+  baseRevision,
+  { force = false, allowResurrect = false } = {},
+) {
+  // A tombstoned row must never be silently un-deleted by an ordinary upsert,
+  // otherwise a stale device can resurrect an entity another device deleted.
+  // This is checked before `force` so even a manual force-sync reports a
+  // conflict instead of reviving deleted data.
+  if (existing?.deleted_at && !allowResurrect) {
+    return {
+      cloudRevision: getCloudRevision(existing),
+      reason: 'remote_deleted',
+    }
+  }
+
   if (force) {
     return null
   }

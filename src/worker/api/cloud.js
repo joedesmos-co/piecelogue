@@ -441,7 +441,10 @@ async function handleGetLibrary(request, env) {
     return withCloudHeaders(auth.error)
   }
 
-  const library = await getCloudLibrary(env.DB, auth.user.id)
+  const includeDeleted =
+    new URL(request.url).searchParams.get('includeDeleted') === '1'
+
+  const library = await getCloudLibrary(env.DB, auth.user.id, { includeDeleted })
   return withCloudHeaders(
     jsonOk({
       ok: true,

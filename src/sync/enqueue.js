@@ -7,7 +7,7 @@ export function setSyncWakeHandler(handler) {
   wakeHandler = handler
 }
 
-function notifyWake() {
+export function notifyWake() {
   wakeHandler?.()
 }
 

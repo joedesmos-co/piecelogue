@@ -154,8 +154,9 @@ export default function CloudSaveSection({ authenticated }) {
 
       <div className="settings-card">
         <p className="settings-text settings-text--muted">
-          Changes and deletes on this device sync automatically while you are signed in. Deleting
-          here removes items from your cloud library too.
+          Your library syncs automatically while you are signed in — there is nothing to press.
+          Changes, new images and deletes push on their own, and edits made on your other devices
+          arrive when you come back. Deleting here removes items from your cloud library too.
         </p>
 
         <div
@@ -345,7 +346,7 @@ export default function CloudSaveSection({ authenticated }) {
           {showForceWarning ? (
             <div className="cloud-save-warning" role="note">
               <p className="settings-text">
-                Force full sync uploads this device&apos;s entire library to your account and clears
+                Sync now uploads this device&apos;s entire library to your account and clears
                 pending auto-sync jobs. Use this if auto-sync gets stuck.
               </p>
               <div className="account-actions">
@@ -355,7 +356,7 @@ export default function CloudSaveSection({ authenticated }) {
                   onClick={handleForceSync}
                   disabled={!canForceSync}
                 >
-                  Force full sync
+                  Sync now
                 </button>
                 <button
                   type="button"
@@ -374,7 +375,7 @@ export default function CloudSaveSection({ authenticated }) {
               onClick={() => setShowForceWarning(true)}
               disabled={!canForceSync}
             >
-              Force full sync
+              Sync now
             </button>
           )}
         </div>
@@ -420,7 +421,7 @@ export default function CloudSaveSection({ authenticated }) {
 
         {forceResult ? (
           <div className="cloud-save-success" role="status">
-            Force synced {forceResult.folderCount} folders and {forceResult.artworkCount} artworks.
+            Synced {forceResult.folderCount} folders and {forceResult.artworkCount} artworks.
           </div>
         ) : null}
       </div>

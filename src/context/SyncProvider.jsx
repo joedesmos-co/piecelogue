@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { setActiveSyncUserId } from '../sync/activeUser'
 import { setSyncWakeHandler } from '../sync/enqueue'
+import { startAutoSync, stopAutoSync } from '../sync/autoSync'
 import {
   recoverSyncJobs,
   refreshSyncStatus,
@@ -13,7 +14,9 @@ import {
   wakeSyncProcessor,
 } from '../sync/processor'
 import { runLegacyImageMigrationBatch } from '../db/legacyImageMigration'
-import { clearRetryScheduler } from '../sync/retryScheduler'
+import { clearRetryScheduler, recoverStuckProcessingJobs } from '../sync/retryScheduler'
+import { resetSyncUploadRuntimeState } from '../sync/processor'
+import { notifyCloudDataChanged } from '../sync/cloudDataEvents'
 import { SyncContext } from './syncContext'
 
 const INITIAL_STATUS = {
@@ -56,6 +59,7 @@ export function SyncProvider({ children }) {
     if (!authenticated || !userId) {
       setActiveSyncUserId(null)
       stopSyncProcessor()
+      stopAutoSync()
       return undefined
     }
 
@@ -86,52 +90,62 @@ export function SyncProvider({ children }) {
     const stop = startSyncProcessor(userId)
     initialize()
 
+    // Automatic multi-device sync. Starts a coordinator that handles app load,
+    // login, focus, reconnect, local edits and a visible-tab interval.
+    // SyncProvider renders ABOVE ArtworkProvider, so it cannot read that
+    // context; it broadcasts instead and ArtworkProvider listens.
+    startAutoSync({
+      userId,
+      onChanged: () => {
+        if (cancelled) {
+          return
+        }
+        notifyCloudDataChanged()
+        refreshSyncStatus(userId)
+      },
+    })
+
     return () => {
       cancelled = true
       setActiveSyncUserId(null)
       stop()
       stopSyncProcessor()
+      stopAutoSync()
       clearRetryScheduler()
     }
   }, [authenticated, authLoading, userId])
 
+  // Local-only housekeeping on visibility change. All network activity is owned
+  // by the auto-sync coordinator, so this must not duplicate its requests.
   useEffect(() => {
     if (!userId) {
       return undefined
     }
 
-    async function resumeSync() {
-      await recoverSyncJobs(userId)
-      wakeSyncProcessor()
-      await refreshSyncStatus(userId)
+    async function recoverStuck() {
+      const recovered = await recoverStuckProcessingJobs(userId)
+      if (recovered > 0) {
+        resetSyncUploadRuntimeState()
+        refreshSyncStatus(userId)
+      }
     }
 
-    function handleOnline() {
-      resumeSync()
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        recoverStuck()
+      }
     }
 
     function handleOffline() {
       refreshSyncStatus(userId)
     }
 
-    function handleVisibilityChange() {
-      if (document.visibilityState === 'visible') {
-        resumeSync()
-      }
-    }
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    window.addEventListener('pageshow', resumeSync)
-    window.addEventListener('focus', resumeSync)
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('offline', handleOffline)
 
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-      window.removeEventListener('pageshow', resumeSync)
-      window.removeEventListener('focus', resumeSync)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('offline', handleOffline)
     }
   }, [userId])
 

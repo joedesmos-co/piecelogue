@@ -69,6 +69,8 @@ function normalizeFolderInput(rawFolder) {
     folder,
     baseRevision: normalizeBaseRevision(rawFolder.baseRevision),
     force: Boolean(rawFolder.force),
+    // Only an explicit user "Restore" action may revive a tombstone.
+    allowResurrect: rawFolder.allowResurrect === true,
   }
 }
 
@@ -78,6 +80,7 @@ function normalizeArtworkInput(rawArtwork) {
     artwork,
     baseRevision: normalizeBaseRevision(rawArtwork.baseRevision),
     force: Boolean(rawArtwork.force),
+    allowResurrect: rawArtwork.allowResurrect === true,
   }
 }
 
@@ -90,7 +93,7 @@ export async function upsertCloudFolders(db, userId, folders) {
   const conflicts = []
 
   for (const rawFolder of folders) {
-    const { folder, baseRevision, force } = normalizeFolderInput(rawFolder)
+    const { folder, baseRevision, force, allowResurrect } = normalizeFolderInput(rawFolder)
     const existing = await db
       .prepare(
         `SELECT id, user_id, name, parent_folder_id, created_at, updated_at, deleted_at, revision
@@ -104,7 +107,10 @@ export async function upsertCloudFolders(db, userId, folders) {
       throw new Error('Folder id is already used by another account.')
     }
 
-    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, { force })
+    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, {
+      force,
+      allowResurrect,
+    })
     if (revisionConflict) {
       conflicts.push(
         buildConflictRecord({
@@ -161,7 +167,7 @@ export async function upsertCloudArtworks(db, userId, artworks) {
   const conflicts = []
 
   for (const rawArtwork of artworks) {
-    const { artwork, baseRevision, force } = normalizeArtworkInput(rawArtwork)
+    const { artwork, baseRevision, force, allowResurrect } = normalizeArtworkInput(rawArtwork)
     const existing = await db
       .prepare(
         `SELECT id, user_id, folder_id, title, medium_type, medium, status,
@@ -178,7 +184,10 @@ export async function upsertCloudArtworks(db, userId, artworks) {
       throw new Error('Artwork id is already used by another account.')
     }
 
-    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, { force })
+    const revisionConflict = evaluateRevisionConflict(existing, baseRevision, {
+      force,
+      allowResurrect,
+    })
     if (revisionConflict) {
       conflicts.push(
         buildConflictRecord({
@@ -293,7 +302,7 @@ export async function softDeleteCloudFolder(db, userId, folderId) {
   await db
     .prepare(
       `UPDATE folders
-       SET deleted_at = ?, updated_at = ?
+       SET deleted_at = ?, updated_at = ?, revision = COALESCE(revision, 1) + 1
        WHERE id = ? AND user_id = ?`,
     )
     .bind(deletedAt, deletedAt, folderId, userId)
@@ -328,6 +337,7 @@ export async function softDeleteCloudArtwork(db, bucket, userId, artworkId) {
       `UPDATE artworks
        SET deleted_at = ?,
            updated_at = ?,
+           revision = COALESCE(revision, 1) + 1,
            original_object_key = NULL,
            thumbnail_object_key = NULL
        WHERE id = ? AND user_id = ?`,
@@ -505,6 +515,7 @@ export function mapCloudFolderRow(row) {
     revision: row.revision ?? 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
@@ -527,15 +538,17 @@ export function mapCloudArtworkRow(row) {
     hasThumbnail: Boolean(row.thumbnail_object_key),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
-export async function getCloudLibrary(db, userId) {
+export async function getCloudLibrary(db, userId, { includeDeleted = false } = {}) {
+  const deletedFilter = includeDeleted ? '' : 'AND deleted_at IS NULL'
   const folderResult = await db
     .prepare(
-      `SELECT id, name, parent_folder_id, revision, created_at, updated_at
+      `SELECT id, name, parent_folder_id, revision, created_at, updated_at, deleted_at
        FROM folders
-       WHERE user_id = ? AND deleted_at IS NULL
+       WHERE user_id = ? ${deletedFilter}
        ORDER BY created_at`,
     )
     .bind(userId)
@@ -545,9 +558,9 @@ export async function getCloudLibrary(db, userId) {
     .prepare(
       `SELECT id, folder_id, title, medium_type, medium, status,
               hours, minutes, total_minutes, artwork_date, notes, favorite, revision,
-              original_object_key, thumbnail_object_key, created_at, updated_at
+              original_object_key, thumbnail_object_key, created_at, updated_at, deleted_at
        FROM artworks
-       WHERE user_id = ? AND deleted_at IS NULL
+       WHERE user_id = ? ${deletedFilter}
        ORDER BY created_at`,
     )
     .bind(userId)

@@ -13,6 +13,7 @@ export async function saveSyncConflict({
   cloudRevision = 0,
   local = null,
   cloud = null,
+  reason = 'stale_revision',
 }) {
   const id = conflictKey(userId, entityType, entityId)
   const now = new Date().toISOString()
@@ -27,6 +28,7 @@ export async function saveSyncConflict({
     cloudRevision,
     local,
     cloud,
+    reason,
     createdAt: now,
     updatedAt: now,
   })

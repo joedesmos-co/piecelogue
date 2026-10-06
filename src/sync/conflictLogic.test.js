@@ -45,9 +45,37 @@ describe('evaluateRevisionConflict', () => {
     assert.equal(evaluateRevisionConflict(existingFolder, 1, { force: true }), null)
   })
 
-  it('allows inserts when cloud row is missing or deleted', () => {
+  it('allows inserts when no cloud row exists', () => {
     assert.equal(evaluateRevisionConflict(null, 0), null)
-    assert.equal(evaluateRevisionConflict({ revision: 2, deleted_at: '2026-01-01' }, 2), null)
+  })
+
+  // A stale device pushing an upsert must NOT silently un-delete a tombstone,
+  // otherwise deleting on one device is undone by a push from another.
+  it('refuses to resurrect a tombstoned row', () => {
+    const deleted = { revision: 2, deleted_at: '2026-01-01' }
+
+    assert.equal(evaluateRevisionConflict(deleted, 2)?.reason, 'remote_deleted')
+    assert.equal(evaluateRevisionConflict(deleted, 1)?.reason, 'remote_deleted')
+    assert.equal(evaluateRevisionConflict(deleted, 0)?.reason, 'remote_deleted')
+  })
+
+  // Even a manual force-sync must not revive deleted data.
+  it('refuses to resurrect a tombstone even when force is set', () => {
+    const conflict = evaluateRevisionConflict(
+      { revision: 3, deleted_at: '2026-01-01' },
+      3,
+      { force: true },
+    )
+    assert.equal(conflict?.reason, 'remote_deleted')
+  })
+
+  it('allows an explicit resurrect when a caller opts in', () => {
+    assert.equal(
+      evaluateRevisionConflict({ revision: 3, deleted_at: '2026-01-01' }, 3, {
+        allowResurrect: true,
+      }),
+      null,
+    )
   })
 })
 

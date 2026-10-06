@@ -7,7 +7,13 @@ import {
   summarizeArtworkConflict,
   summarizeFolderConflict,
 } from '../sync/conflictLogic'
-import { resolveKeepCloud, resolveKeepLocal } from '../sync/conflictResolution'
+import {
+  isRemoteDeletedConflict,
+  resolveKeepCloud,
+  resolveKeepDeleted,
+  resolveKeepLocal,
+  resolveRestoreDeleted,
+} from '../sync/conflictResolution'
 import { SYNC_ENTITY_TYPES } from '../sync/constants'
 import { refreshSyncStatus, wakeSyncProcessor } from '../sync/processor'
 import { formatUserError } from '../utils/userErrors'
@@ -86,6 +92,10 @@ export function CloudConflictPanel() {
     try {
       if (choice === 'local') {
         await resolveKeepLocal(conflict)
+      } else if (choice === 'keep-deleted') {
+        await resolveKeepDeleted(conflict)
+      } else if (choice === 'restore') {
+        await resolveRestoreDeleted(conflict)
       } else {
         await resolveKeepCloud(conflict)
       }
@@ -104,11 +114,14 @@ export function CloudConflictPanel() {
     return null
   }
 
+  const hasRemoteDeleted = conflicts.some(isRemoteDeletedConflict)
+
   return (
     <div className="cloud-sync-conflicts">
       <p className="settings-text settings-text--muted">
-        The same item was changed on another device. Choose which version to keep for each
-        conflict.
+        {hasRemoteDeleted
+          ? 'Some items need your decision before syncing can continue.'
+          : 'The same item was changed on another device. Choose which version to keep for each conflict.'}
       </p>
 
       {loading && conflicts.length === 0 ? (
@@ -127,6 +140,46 @@ export function CloudConflictPanel() {
         {conflicts.map((conflict) => {
           const summary = summarizeConflict(conflict)
           const busy = resolvingId === conflict.id
+          const remoteDeleted = isRemoteDeletedConflict(conflict)
+
+          if (remoteDeleted) {
+            const noun = entityLabel(conflict.entityType).toLowerCase()
+            const restoreLabel =
+              conflict.entityType === SYNC_ENTITY_TYPES.FOLDER ? 'Restore folder' : 'Restore artwork'
+
+            return (
+              <li key={conflict.id} className="sync-conflict-item">
+                <div className="sync-conflict-item-header">
+                  <p className="sync-conflict-title">Deleted on another device</p>
+                  <p className="settings-text settings-text--muted">{summary.title}</p>
+                </div>
+
+                <p className="settings-text">
+                  This {noun} was deleted on another device, but this device has changes that
+                  haven&apos;t been synced yet.
+                </p>
+
+                <div className="account-actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleResolve(conflict, 'keep-deleted')}
+                  >
+                    Keep deleted
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleResolve(conflict, 'restore')}
+                  >
+                    {restoreLabel}
+                  </button>
+                </div>
+              </li>
+            )
+          }
 
           return (
             <li key={conflict.id} className="sync-conflict-item">

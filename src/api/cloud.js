@@ -123,8 +123,9 @@ export async function fetchCloudStatus() {
   return data.status ?? null
 }
 
-export async function fetchCloudLibrary() {
-  const data = await apiFetch('/api/cloud/library')
+export async function fetchCloudLibrary({ includeDeleted = false } = {}) {
+  const query = includeDeleted ? '?includeDeleted=1' : ''
+  const data = await apiFetch(`/api/cloud/library${query}`)
   return data.library ?? { folders: [], artworks: [] }
 }
 
