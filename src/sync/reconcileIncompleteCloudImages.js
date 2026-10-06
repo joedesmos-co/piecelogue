@@ -3,7 +3,7 @@ import * as artworkService from '../db/artworkService.js'
 import { IMAGE_KINDS } from '../db/artworkImageKeys.js'
 import {
   clearImageRecoveryRequired,
-  hasVerifiedDurableImage,
+  hasStoredImageBytes,
   markImageRecoveryRequired,
 } from '../db/artworkImageStorage.js'
 import { clearImageHashes } from '../db/syncImageHashService.js'
@@ -59,8 +59,10 @@ export async function reconcileIncompleteCloudImages(userId, options = {}) {
   lastReconcileAt = now
 
   for (const entry of incomplete) {
-    const hasOriginal = await hasVerifiedDurableImage(entry.artworkId, IMAGE_KINDS.ORIGINAL)
-    const hasThumbnail = await hasVerifiedDurableImage(entry.artworkId, IMAGE_KINDS.THUMBNAIL)
+    // Probe raw byte presence, not the verified flag: an image that is flagged
+    // but still intact must be re-queued for upload, not re-flagged forever.
+    const hasOriginal = await hasStoredImageBytes(entry.artworkId, IMAGE_KINDS.ORIGINAL)
+    const hasThumbnail = await hasStoredImageBytes(entry.artworkId, IMAGE_KINDS.THUMBNAIL)
 
     if (entry.missingOriginal || entry.missingThumbnail) {
       if ((entry.missingOriginal && hasOriginal) || (entry.missingThumbnail && (hasThumbnail || hasOriginal))) {

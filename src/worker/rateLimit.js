@@ -23,7 +23,7 @@ export async function checkRateLimit(db, bucketKey, { maxHits, windowMs }, nowMs
     await db
       .prepare(
         `INSERT INTO rate_limit_buckets (bucket_key, window_start, hit_count)
-         VALUES (?, ?, 1)
+         VALUES (?, ?, ?)
          ON CONFLICT(bucket_key) DO UPDATE SET
            window_start = excluded.window_start,
            hit_count = excluded.hit_count`,

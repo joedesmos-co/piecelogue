@@ -208,17 +208,23 @@ export default function AccountSection() {
                 </p>
               ) : null}
               <div className="account-sign-in-options">
+                {/* Apple sign-in stays hidden in production until APPLE_* secrets
+                    are configured. The backend scaffold remains intact. */}
+                {import.meta.env.DEV ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary account-oauth-btn account-apple-btn"
+                    onClick={startAppleSignIn}
+                    aria-label="Continue with Apple"
+                  >
+                    Continue with Apple
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="btn btn--primary account-oauth-btn account-apple-btn"
-                  onClick={startAppleSignIn}
-                  aria-label="Continue with Apple"
-                >
-                  Continue with Apple
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--secondary account-oauth-btn account-google-btn"
+                  className={`btn account-oauth-btn account-google-btn ${
+                    import.meta.env.DEV ? 'btn--secondary' : 'btn--primary'
+                  }`}
                   onClick={startGoogleSignIn}
                   aria-label="Continue with Google"
                 >

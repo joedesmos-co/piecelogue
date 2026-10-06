@@ -38,7 +38,7 @@ import {
 import { hashBytes, shouldUploadImage } from './imageHash'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
 import { readArtworkImageBytes } from '../db/artworkImageReader'
-import { markImageRecoveryRequired } from '../db/artworkImageStorage'
+import { markImageRecoveryRequired, hasStoredImageBytes } from '../db/artworkImageStorage'
 import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration'
 import { getArtworksNeedingImageRecovery, resolveArtworkImageForSync } from '../db/imageRepair'
 import { createUploadRequestId } from './uploadDiagnostics'
@@ -298,7 +298,12 @@ async function processArtworkImageJob(job) {
       if (result.error.code === 'missing_image' && storedHash && !cloudMissing) {
         return storedHash
       }
-      await markImageRecoveryRequired(artwork.id, kind, result.error.code)
+      // Local IndexedDB bytes are authoritative. Only flag recovery when
+      // nothing usable is actually stored, so a faulty or transient read
+      // cannot condemn (or destroy) an intact local image.
+      if (!(await hasStoredImageBytes(artwork.id, kind))) {
+        await markImageRecoveryRequired(artwork.id, kind, result.error.code)
+      }
       throw result.error
     }
 

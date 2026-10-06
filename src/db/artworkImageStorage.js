@@ -15,6 +15,23 @@ function normalizeBytes(bytes) {
   throw new Error('Image bytes must be an ArrayBuffer or typed array.')
 }
 
+function readStoredBytes(record) {
+  if (!record?.data) {
+    return null
+  }
+  const bytes = record.data instanceof Uint8Array ? record.data : new Uint8Array(record.data)
+  return bytes.byteLength > 0 ? bytes : null
+}
+
+/**
+ * True when the record holds self-consistent, non-empty local bytes,
+ * regardless of the recoveryRequired flag.
+ */
+function hasUsableBytes(record) {
+  const bytes = readStoredBytes(record)
+  return Boolean(bytes && record.byteLength > 0 && bytes.byteLength === record.byteLength)
+}
+
 export async function getDurableImageRecord(artworkId, kind) {
   return db.artworkImages.get(buildArtworkImageId(artworkId, kind))
 }
@@ -24,12 +41,18 @@ export async function hasVerifiedDurableImage(artworkId, kind) {
   if (!record || record.recoveryRequired) {
     return false
   }
-  if (!record.data || !record.byteLength) {
-    return false
-  }
-  const bytes =
-    record.data instanceof Uint8Array ? record.data : new Uint8Array(record.data)
-  return bytes.byteLength === record.byteLength && bytes.byteLength > 0
+  return hasUsableBytes(record)
+}
+
+/**
+ * Byte-presence probe that ignores recoveryRequired.
+ *
+ * Callers use this to tell "local bytes are gone" apart from "local bytes exist
+ * but are flagged", so a flagged-but-intact image is re-queued rather than
+ * re-flagged (which would otherwise deadlock the reconcile loop).
+ */
+export async function hasStoredImageBytes(artworkId, kind) {
+  return hasUsableBytes(await getDurableImageRecord(artworkId, kind))
 }
 
 export async function saveDurableImageBytes(artworkId, kind, bytes, mimeType, options = {}) {
@@ -67,16 +90,27 @@ export async function saveDurableImageBytes(artworkId, kind, bytes, mimeType, op
   return record
 }
 
+/**
+ * Flag an image as needing attention WITHOUT discarding local bytes.
+ *
+ * Local IndexedDB bytes are authoritative: a failed read, failed upload,
+ * unavailable R2, or expired auth must never destroy the only local copy.
+ * Existing self-consistent bytes are preserved alongside the recovery flag;
+ * bytes are only cleared when nothing usable was stored to begin with.
+ */
 export async function markImageRecoveryRequired(artworkId, kind, reason = 'unreadable_blob') {
   const id = buildArtworkImageId(artworkId, kind)
   const existing = await db.artworkImages.get(id)
+  const preserveBytes = hasUsableBytes(existing)
+
   await db.artworkImages.put({
+    ...(preserveBytes ? existing : {}),
     id,
     artworkId,
     kind,
     mimeType: existing?.mimeType ?? null,
-    byteLength: 0,
-    data: null,
+    byteLength: preserveBytes ? existing.byteLength : 0,
+    data: preserveBytes ? existing.data : null,
     recoveryRequired: true,
     recoveryReason: reason,
     migratedFromLegacy: existing?.migratedFromLegacy ?? false,

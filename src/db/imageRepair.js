@@ -4,6 +4,7 @@ import { IMAGE_KINDS } from './artworkImageKeys.js'
 import {
   clearImageRecoveryRequired,
   getArtworksNeedingImageRecovery,
+  getDurableImageRecord,
 } from './artworkImageStorage.js'
 import { writeIncomingImageBytes } from './legacyImageMigration.js'
 import { readStoredImageBytes } from './readStoredImageBytes.js'
@@ -68,6 +69,29 @@ export async function repairArtworkImagesFromCloud(artworkId, options = {}) {
   return results
 }
 
+/**
+ * Resolve the durable-record reader for image reads.
+ *
+ * The sync path calls resolveArtworkImageForSync() with no dependency injection,
+ * so the default must be the real Dexie artworkImages store. Previously this
+ * resolved to `async () => null`, which silently skipped durable bytes and made
+ * every sync read fall through to the legacy artwork.image field.
+ */
+function resolveDurableRecordReader(options = {}) {
+  return (
+    options.getDurableRecord ?? options.deps?.getDurableRecord ?? getDurableImageRecord
+  )
+}
+
+function buildImageReadDeps(options = {}) {
+  // getDurableRecord is spread last so an injected undefined can never
+  // reintroduce the null-returning fallback.
+  return {
+    ...options.deps,
+    getDurableRecord: resolveDurableRecordReader(options),
+  }
+}
+
 export async function resolveArtworkImageForSync(artwork, kind, options = {}) {
   const artworkId = artwork.id
   const legacyBlob = kind === IMAGE_KINDS.THUMBNAIL ? artwork.thumbnail : artwork.image
@@ -75,10 +99,7 @@ export async function resolveArtworkImageForSync(artwork, kind, options = {}) {
     artworkId,
     kind,
     { legacyBlob },
-    {
-      getDurableRecord: options.getDurableRecord,
-      ...options.deps,
-    },
+    buildImageReadDeps(options),
   )
 
   if (
@@ -89,7 +110,7 @@ export async function resolveArtworkImageForSync(artwork, kind, options = {}) {
   ) {
     const repair = await tryRepairArtworkImageFromCloud(artworkId, kind, options)
     if (repair.repaired) {
-      result = await readStoredImageBytes(artworkId, kind, {}, options.deps)
+      result = await readStoredImageBytes(artworkId, kind, {}, buildImageReadDeps(options))
     }
   }
 
