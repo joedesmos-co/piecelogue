@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -33,6 +33,7 @@ import GalleryContextMenu from '../components/GalleryContextMenu'
 import LoadingState from '../components/LoadingState'
 import ArtworkActionsSheet from '../components/ArtworkActionsSheet'
 import MoveToFolderSheet from '../components/MoveToFolderSheet'
+import { shouldTriggerEdgeBackSwipe } from '../utils/gestures'
 
 export default function GalleryPage({ onAdd, onEdit }) {
   const { authenticated } = useAuth()
@@ -68,6 +69,11 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const [movingArtwork, setMovingArtwork] = useState(false)
   const [dragArtworkId, setDragArtworkId] = useState(null)
   const [dropFolderId, setDropFolderId] = useState(null)
+  // Artwork Detail swipe context: the visible collection the user opened, so
+  // next/previous stays inside the same folder scope + sort/filter order.
+  const [detailIds, setDetailIds] = useState([])
+  const [detailIndex, setDetailIndex] = useState(-1)
+  const edgeSwipeRef = useRef(null)
 
   const unfiledArtworks = useMemo(
     () => artworks.filter((artwork) => !artwork.folderId),
@@ -141,18 +147,108 @@ export default function GalleryPage({ onAdd, onEdit }) {
     setSelectedFolderId(folderId)
     setView(GALLERY_VIEWS.FOLDER)
     setSelectedArtwork(null)
+    setDetailIds([])
+    setDetailIndex(-1)
   }
 
   function goHome() {
     setView(GALLERY_VIEWS.HOME)
     setSelectedFolderId(null)
     setSelectedArtwork(null)
+    setDetailIds([])
+    setDetailIndex(-1)
   }
 
   function showUnfiled() {
     setView(GALLERY_VIEWS.UNFILED)
     setSelectedFolderId(null)
     setSelectedArtwork(null)
+    setDetailIds([])
+    setDetailIndex(-1)
+  }
+
+  /** Go to the immediate parent folder (or Gallery root for top-level). */
+  function goToParentFolder() {
+    if (view !== GALLERY_VIEWS.FOLDER) return
+    const parentId = normalizeParentFolderId(selectedFolder?.parentFolderId)
+    if (parentId) {
+      openFolder(parentId)
+    } else {
+      goHome()
+    }
+  }
+
+  /** iOS-style edge swipe back: left-edge touch, horizontal move right. */
+  function handleGalleryTouchStart(event) {
+    if (view !== GALLERY_VIEWS.FOLDER) {
+      edgeSwipeRef.current = null
+      return
+    }
+    if (event.touches.length !== 1) {
+      edgeSwipeRef.current = null
+      return
+    }
+    const touch = event.touches[0]
+    // Never start from drag/long-press, horizontal strips, or controls.
+    if (
+      dragArtworkId ||
+      touch.clientX > 28 ||
+      event.target.closest(
+        'button, a, input, select, textarea, .folder-card, .artwork-card, .gallery-toolbar, [data-no-edge-swipe]',
+      )
+    ) {
+      edgeSwipeRef.current = null
+      return
+    }
+    edgeSwipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      startTime: Date.now(),
+    }
+  }
+
+  function handleGalleryTouchEnd(event) {
+    const start = edgeSwipeRef.current
+    edgeSwipeRef.current = null
+    if (!start || view !== GALLERY_VIEWS.FOLDER) return
+    const touch = event.changedTouches[0]
+    if (!touch) return
+    if (
+      shouldTriggerEdgeBackSwipe({
+        startX: start.startX,
+        startY: start.startY,
+        endX: touch.clientX,
+        endY: touch.clientY,
+        durationMs: Date.now() - start.startTime,
+      })
+    ) {
+      goToParentFolder()
+    }
+  }
+
+  function openArtworkDetail(artwork, collection = matchingArtworks) {
+    const list = Array.isArray(collection) ? collection : matchingArtworks
+    const index = list.findIndex((item) => item.id === artwork.id)
+    setDetailIds(list.map((item) => item.id))
+    setDetailIndex(index >= 0 ? index : -1)
+    setSelectedArtwork(artwork)
+  }
+
+  function stepDetail(direction) {
+    if (!detailIds.length || detailIndex < 0) return
+    const nextIndex = direction === 'next' ? detailIndex + 1 : detailIndex - 1
+    if (nextIndex < 0 || nextIndex >= detailIds.length) return
+    const nextId = detailIds[nextIndex]
+    const next = artworks.find((item) => item.id === nextId)
+    if (!next) return
+    setDetailIndex(nextIndex)
+    setSelectedArtwork(next)
+  }
+
+  function closeArtworkDetail() {
+    setSelectedArtwork(null)
+    setDetailIds([])
+    setDetailIndex(-1)
   }
 
   function handleBreadcrumbNavigate(index) {
@@ -242,8 +338,16 @@ export default function GalleryPage({ onAdd, onEdit }) {
     setDeleting(true)
     try {
       await removeArtwork(deleteTarget.id)
+      // Uses the normal deletion service path (local metadata/images +
+      // tombstone/cloud enqueue inside removeArtwork), then clears state and
+      // closes any sheet/dialog.
       setDeleteTarget(null)
-      setSelectedArtwork(null)
+      setActionArtwork(null)
+      if (selectedArtwork?.id === deleteTarget.id) {
+        closeArtworkDetail()
+      } else {
+        setSelectedArtwork(null)
+      }
     } catch {
       // Keep dialog open on error
     } finally {
@@ -305,13 +409,19 @@ export default function GalleryPage({ onAdd, onEdit }) {
         <ArtworkDetail
           artwork={current}
           folders={folders}
-          onBack={() => setSelectedArtwork(null)}
+          onBack={closeArtworkDetail}
           onEdit={(artwork) => {
-            setSelectedArtwork(null)
+            closeArtworkDetail()
             onEdit(artwork)
           }}
           onDelete={(artwork) => setDeleteTarget(artwork)}
           onToggleFavorite={handleToggleFavorite}
+          hasPrevious={detailIndex > 0}
+          hasNext={detailIndex >= 0 && detailIndex < detailIds.length - 1}
+          position={detailIndex >= 0 ? detailIndex + 1 : null}
+          total={detailIds.length > 1 ? detailIds.length : null}
+          onPrevious={() => stepDetail('prev')}
+          onNext={() => stepDetail('next')}
           onImageRepaired={async () => {
             await refresh()
             await retryNow()
@@ -343,7 +453,12 @@ export default function GalleryPage({ onAdd, onEdit }) {
   const hasAnyArtwork = artworks.length > 0
 
   return (
-    <div className="page gallery-page" onContextMenu={handleGalleryContextMenu}>
+    <div
+      className="page gallery-page"
+      onContextMenu={handleGalleryContextMenu}
+      onTouchStart={handleGalleryTouchStart}
+      onTouchEnd={handleGalleryTouchEnd}
+    >
       <header className="page-header gallery-header">
         <div className="gallery-header-main">
           {view === GALLERY_VIEWS.FOLDER ? (
@@ -589,7 +704,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
                     key={artwork.id}
                     artwork={artwork}
                     folders={folders}
-                    onClick={setSelectedArtwork}
+                    onClick={(item) => openArtworkDetail(item)}
                     onOpenActions={setActionArtwork}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
@@ -633,6 +748,16 @@ export default function GalleryPage({ onAdd, onEdit }) {
         onConfirm={handleDeleteFolder}
         folder={deleteFolderTarget}
         busy={deletingFolder}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteArtwork}
+        title="Delete Artwork"
+        message={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
+        confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+        busy={deleting}
       />
 
       <GalleryContextMenu

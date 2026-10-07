@@ -45,6 +45,14 @@ function normalizeArtworkMetadata(artwork) {
     throw new Error('Artwork title is required.')
   }
 
+  // Unknown duration round-trips as hours/minutes/total = 0 plus an explicit
+  // flag, because the D1 columns are NOT NULL DEFAULT 0 (migration 0007 adds
+  // duration_unknown). Local clients store null; the flag preserves meaning.
+  const durationUnknown =
+    artwork.durationUnknown === true ||
+    artwork.duration_unknown === 1 ||
+    artwork.duration_unknown === true
+
   return {
     id: artwork.id,
     folderId: artwork.folderId ?? null,
@@ -52,9 +60,10 @@ function normalizeArtworkMetadata(artwork) {
     mediumType: artwork.mediumType || 'Other',
     medium: artwork.medium || '',
     status: artwork.status || 'In Progress',
-    hours: Math.max(0, Number(artwork.hours) || 0),
-    minutes: Math.max(0, Math.min(59, Number(artwork.minutes) || 0)),
-    totalMinutes: Math.max(0, Number(artwork.totalMinutes) || 0),
+    hours: durationUnknown ? 0 : Math.max(0, Number(artwork.hours) || 0),
+    minutes: durationUnknown ? 0 : Math.max(0, Math.min(59, Number(artwork.minutes) || 0)),
+    totalMinutes: durationUnknown ? 0 : Math.max(0, Number(artwork.totalMinutes) || 0),
+    durationUnknown,
     artworkDate: artwork.artworkDate || null,
     notes: artwork.notes || '',
     favorite: artwork.favorite ? 1 : 0,
@@ -171,7 +180,7 @@ export async function upsertCloudArtworks(db, userId, artworks) {
     const existing = await db
       .prepare(
         `SELECT id, user_id, folder_id, title, medium_type, medium, status,
-                hours, minutes, total_minutes, artwork_date, notes, favorite,
+                hours, minutes, total_minutes, duration_unknown, artwork_date, notes, favorite,
                 original_object_key, thumbnail_object_key,
                 created_at, updated_at, deleted_at, revision
          FROM artworks
@@ -214,6 +223,7 @@ export async function upsertCloudArtworks(db, userId, artworks) {
                hours = ?,
                minutes = ?,
                total_minutes = ?,
+               duration_unknown = ?,
                artwork_date = ?,
                notes = ?,
                favorite = ?,
@@ -231,6 +241,7 @@ export async function upsertCloudArtworks(db, userId, artworks) {
           artwork.hours,
           artwork.minutes,
           artwork.totalMinutes,
+          artwork.durationUnknown ? 1 : 0,
           artwork.artworkDate,
           artwork.notes,
           artwork.favorite,
@@ -246,10 +257,10 @@ export async function upsertCloudArtworks(db, userId, artworks) {
         .prepare(
           `INSERT INTO artworks (
              id, user_id, folder_id, title, medium_type, medium, status,
-             hours, minutes, total_minutes, artwork_date, notes, favorite,
+             hours, minutes, total_minutes, duration_unknown, artwork_date, notes, favorite,
              original_object_key, thumbnail_object_key,
              created_at, updated_at, deleted_at, revision
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, NULL, 1)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, NULL, 1)`,
         )
         .bind(
           artwork.id,
@@ -262,6 +273,7 @@ export async function upsertCloudArtworks(db, userId, artworks) {
           artwork.hours,
           artwork.minutes,
           artwork.totalMinutes,
+          artwork.durationUnknown ? 1 : 0,
           artwork.artworkDate,
           artwork.notes,
           artwork.favorite,
@@ -520,6 +532,7 @@ export function mapCloudFolderRow(row) {
 }
 
 export function mapCloudArtworkRow(row) {
+  const durationUnknown = row.duration_unknown === 1 || row.duration_unknown === true
   return {
     id: row.id,
     folderId: row.folder_id ?? null,
@@ -527,9 +540,10 @@ export function mapCloudArtworkRow(row) {
     mediumType: row.medium_type || 'Other',
     medium: row.medium || '',
     status: row.status || 'In Progress',
-    hours: row.hours ?? 0,
-    minutes: row.minutes ?? 0,
-    totalMinutes: row.total_minutes ?? 0,
+    hours: durationUnknown ? 0 : (row.hours ?? 0),
+    minutes: durationUnknown ? 0 : (row.minutes ?? 0),
+    totalMinutes: durationUnknown ? 0 : (row.total_minutes ?? 0),
+    durationUnknown,
     artworkDate: row.artwork_date ?? null,
     notes: row.notes || '',
     favorite: Boolean(row.favorite),
@@ -557,7 +571,7 @@ export async function getCloudLibrary(db, userId, { includeDeleted = false } = {
   const artworkResult = await db
     .prepare(
       `SELECT id, folder_id, title, medium_type, medium, status,
-              hours, minutes, total_minutes, artwork_date, notes, favorite, revision,
+              hours, minutes, total_minutes, duration_unknown, artwork_date, notes, favorite, revision,
               original_object_key, thumbnail_object_key, created_at, updated_at, deleted_at
        FROM artworks
        WHERE user_id = ? ${deletedFilter}

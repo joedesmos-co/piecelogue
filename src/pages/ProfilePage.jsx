@@ -145,6 +145,25 @@ export default function ProfilePage() {
                 </span>
                 <span className="logbook-hero-note">keep going.</span>
               </div>
+              {stats.unknownCount > 0 ? (
+                <p
+                  className="logbook-hero-sub"
+                  style={{
+                    margin: '10px 0 0',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--paper-text-muted)',
+                  }}
+                >
+                  Based on {stats.trackedCount} artwork{stats.trackedCount !== 1 ? 's' : ''} with
+                  time tracked
+                  {stats.unknownCount === 1
+                    ? ' · 1 without time'
+                    : ` · ${stats.unknownCount} without time`}
+                </p>
+              ) : null}
             </div>
 
             <div className="logbook-grid">

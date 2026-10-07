@@ -57,6 +57,7 @@ function localArtworkSnapshot(artwork) {
     hours: artwork.hours ?? 0,
     minutes: artwork.minutes ?? 0,
     totalMinutes: artwork.totalMinutes ?? 0,
+    durationUnknown: Boolean(artwork.durationUnknown),
     artworkDate: artwork.artworkDate ?? null,
     notes: artwork.notes ?? '',
     favorite: Boolean(artwork.favorite),

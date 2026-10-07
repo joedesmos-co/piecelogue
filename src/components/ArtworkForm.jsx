@@ -46,6 +46,13 @@ export default function ArtworkForm({
   )
   const [hours, setHours] = useState(artwork?.hours ?? '')
   const [minutes, setMinutes] = useState(artwork?.minutes ?? '')
+  const [durationUnknown, setDurationUnknown] = useState(() => {
+    if (!artwork) return false
+    if (artwork.durationUnknown === true) return true
+    return (
+      artwork.hours == null && artwork.minutes == null && artwork.totalMinutes == null
+    )
+  })
   const [status, setStatus] = useState(artwork?.status || 'In Progress')
   const [artworkDate, setArtworkDate] = useState(artwork?.artworkDate || '')
   const [notes, setNotes] = useState(artwork?.notes || '')
@@ -129,15 +136,18 @@ export default function ArtworkForm({
       mediumType,
       medium: medium.trim(),
       folderId: folderId || null,
-      hours: hours === '' ? 0 : Number(hours),
-      minutes: minutes === '' ? 0 : Number(minutes),
+      durationUnknown,
+      hours: durationUnknown ? null : hours === '' ? 0 : Number(hours),
+      minutes: durationUnknown ? null : minutes === '' ? 0 : Number(minutes),
       status,
       artworkDate: artworkDate || null,
       notes,
-      totalMinutes: calculateTotalMinutes(
-        hours === '' ? 0 : hours,
-        minutes === '' ? 0 : minutes,
-      ),
+      totalMinutes: durationUnknown
+        ? null
+        : calculateTotalMinutes(
+            hours === '' ? 0 : hours,
+            minutes === '' ? 0 : minutes,
+          ),
     }
 
     try {
@@ -275,10 +285,11 @@ export default function ArtworkForm({
               id="artwork-hours"
               type="number"
               className="form-input"
-              value={hours}
+              value={durationUnknown ? '' : hours}
               onChange={handleHoursChange}
               min="0"
               placeholder="0"
+              disabled={durationUnknown}
             />
           </div>
 
@@ -290,14 +301,32 @@ export default function ArtworkForm({
               id="artwork-minutes"
               type="number"
               className="form-input"
-              value={minutes}
+              value={durationUnknown ? '' : minutes}
               onChange={handleMinutesChange}
               min="0"
               max="59"
               placeholder="0"
+              disabled={durationUnknown}
             />
           </div>
         </div>
+        <label className="form-check">
+          <input
+            id="artwork-duration-unknown"
+            type="checkbox"
+            className="form-checkbox"
+            checked={durationUnknown}
+            onChange={(event) => {
+              const checked = event.target.checked
+              setDurationUnknown(checked)
+              if (checked) {
+                setHours('')
+                setMinutes('')
+              }
+            }}
+          />
+          <span className="form-check-label">Not sure how long this took</span>
+        </label>
       </WorksheetSection>
 
       <WorksheetSection index="04" title="Details">

@@ -10,6 +10,10 @@ export function toLocalFolder(cloudFolder) {
 }
 
 export function toLocalArtworkMetadata(cloudArtwork) {
+  const unknown =
+    cloudArtwork.durationUnknown === true ||
+    cloudArtwork.duration_unknown === 1 ||
+    cloudArtwork.duration_unknown === true
   return {
     id: cloudArtwork.id,
     folderId: cloudArtwork.folderId ?? null,
@@ -17,9 +21,10 @@ export function toLocalArtworkMetadata(cloudArtwork) {
     mediumType: cloudArtwork.mediumType || 'Other',
     medium: cloudArtwork.medium ?? '',
     status: cloudArtwork.status || 'In Progress',
-    hours: cloudArtwork.hours ?? 0,
-    minutes: cloudArtwork.minutes ?? 0,
-    totalMinutes: cloudArtwork.totalMinutes ?? 0,
+    hours: unknown ? null : (cloudArtwork.hours ?? 0),
+    minutes: unknown ? null : (cloudArtwork.minutes ?? 0),
+    totalMinutes: unknown ? null : (cloudArtwork.totalMinutes ?? 0),
+    durationUnknown: unknown,
     artworkDate: cloudArtwork.artworkDate ?? null,
     notes: cloudArtwork.notes ?? '',
     favorite: Boolean(cloudArtwork.favorite),

@@ -1,5 +1,5 @@
 import { Star, Clock, Folder, MoreHorizontal } from 'lucide-react'
-import { formatTime } from '../utils/formatTime'
+import { UNKNOWN_DURATION_LABEL, formatTime, isDurationUnknown } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getFolderPathLabel } from '../utils/folderTree'
 import { useLongPress } from '../hooks/useLongPress'
@@ -96,11 +96,18 @@ export default function ArtworkCard({
           <span className="badge badge--medium-type">
             {resolveMediumType(artwork)}
           </span>
-          {artwork.totalMinutes > 0 && (
-            <span className="artwork-card-time">
+          {isDurationUnknown(artwork) ? (
+            <span className="artwork-card-time artwork-card-time--unknown">
               <Clock size={12} aria-hidden="true" />
-              {formatTime(artwork.totalMinutes)}
+              {UNKNOWN_DURATION_LABEL}
             </span>
+          ) : (
+            artwork.totalMinutes > 0 && (
+              <span className="artwork-card-time">
+                <Clock size={12} aria-hidden="true" />
+                {formatTime(artwork.totalMinutes)}
+              </span>
+            )
           )}
         </div>
         <div className="artwork-card-details">

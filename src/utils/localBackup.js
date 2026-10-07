@@ -32,7 +32,8 @@ function blobToBase64(blob) {
   })
 }
 
-function serializeArtwork(artwork) {
+export function serializeArtwork(artwork) {
+  const unknown = Boolean(artwork.durationUnknown) || artwork.totalMinutes == null
   return {
     id: artwork.id,
     title: artwork.title,
@@ -40,9 +41,10 @@ function serializeArtwork(artwork) {
     medium: artwork.medium ?? '',
     folderId: artwork.folderId ?? null,
     status: artwork.status,
-    hours: artwork.hours ?? 0,
-    minutes: artwork.minutes ?? 0,
-    totalMinutes: artwork.totalMinutes ?? 0,
+    hours: unknown ? null : (artwork.hours ?? 0),
+    minutes: unknown ? null : (artwork.minutes ?? 0),
+    totalMinutes: unknown ? null : (artwork.totalMinutes ?? 0),
+    durationUnknown: unknown,
     artworkDate: artwork.artworkDate ?? null,
     notes: artwork.notes ?? '',
     favorite: Boolean(artwork.favorite),
@@ -156,6 +158,9 @@ export async function importLocalBackup(backup) {
 
     for (const artwork of validated.artworks) {
       const existing = await db.artworks.get(artwork.id)
+      const unknown =
+        artwork.durationUnknown === true ||
+        (artwork.hours == null && artwork.minutes == null && artwork.totalMinutes == null)
       const record = {
         ...existing,
         id: artwork.id,
@@ -164,9 +169,10 @@ export async function importLocalBackup(backup) {
         medium: artwork.medium ?? '',
         folderId: artwork.folderId ?? null,
         status: artwork.status || 'In Progress',
-        hours: artwork.hours ?? 0,
-        minutes: artwork.minutes ?? 0,
-        totalMinutes: artwork.totalMinutes ?? 0,
+        hours: unknown ? null : (artwork.hours ?? 0),
+        minutes: unknown ? null : (artwork.minutes ?? 0),
+        totalMinutes: unknown ? null : (artwork.totalMinutes ?? 0),
+        durationUnknown: unknown,
         artworkDate: artwork.artworkDate ?? null,
         notes: artwork.notes ?? '',
         favorite: Boolean(artwork.favorite),

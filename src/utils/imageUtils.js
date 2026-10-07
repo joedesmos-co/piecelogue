@@ -1,7 +1,12 @@
-import { normalizeArtworkImage } from './imageNormalize.js'
+import { normalizeArtworkImage, THUMBNAIL_MAX_EDGE } from './imageNormalize.js'
 
-const THUMBNAIL_MAX_SIZE = 400
+const THUMBNAIL_MAX_SIZE = THUMBNAIL_MAX_EDGE
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+/** Largest CSS width a gallery card renders at (grid minmax floor). */
+export const GALLERY_CARD_CSS_WIDTH = 250
+/** Largest CSS width a folder contact-sheet preview renders at. */
+export const FOLDER_PREVIEW_CSS_WIDTH = 120
 
 export function isValidImageFile(file) {
   return file && ACCEPTED_TYPES.includes(file.type)
@@ -93,6 +98,32 @@ export function getFullImageBlobs(artwork) {
 export function getFullImageBlob(artwork) {
   return getFullImageBlobs(artwork)[0] ?? null
 }
+
+/**
+ * Which stored source should render a surface of the given CSS width on a
+ * screen with the given devicePixelRatio?
+ *
+ * - 'thumbnail' when the stored thumbnail edge covers cssWidth * dpr.
+ * - 'original' when the thumbnail would be upscaled (graininess trigger).
+ * - null when neither source exists.
+ *
+ * Pure and unit-tested; the durable hooks implement the same preference
+ * (thumbnail-first for gallery, original-first for detail).
+ */
+export function selectGallerySource({ thumbnailWidth = 0, hasOriginal = false, displayCssWidth = GALLERY_CARD_CSS_WIDTH, devicePixelRatio = 1 } = {}) {
+  const thumb = Number(thumbnailWidth) || 0
+  const css = Math.max(1, Number(displayCssWidth) || GALLERY_CARD_CSS_WIDTH)
+  const dpr = Math.min(4, Math.max(1, Number(devicePixelRatio) || 1))
+  const required = Math.ceil(css * dpr)
+
+  if (thumb > 0 && thumb >= required) return 'thumbnail'
+  if (hasOriginal) return 'original'
+  if (thumb > 0) return 'thumbnail'
+  return null
+}
+
+/** Back-compat export for the canonical thumbnail edge. */
+export { THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_SIZE }
 
 export function readFileAsBlob(file) {
   return new Promise((resolve, reject) => {

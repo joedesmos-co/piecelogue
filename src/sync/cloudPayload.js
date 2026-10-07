@@ -2,6 +2,7 @@ export function toCloudArtworkMetadata(
   artwork,
   { baseRevision, force = false, allowResurrect = false } = {},
 ) {
+  const unknown = Boolean(artwork.durationUnknown) || artwork.totalMinutes == null
   return {
     id: artwork.id,
     folderId: artwork.folderId ?? null,
@@ -9,9 +10,10 @@ export function toCloudArtworkMetadata(
     mediumType: artwork.mediumType,
     medium: artwork.medium ?? '',
     status: artwork.status,
-    hours: artwork.hours ?? 0,
-    minutes: artwork.minutes ?? 0,
-    totalMinutes: artwork.totalMinutes ?? 0,
+    hours: unknown ? 0 : (artwork.hours ?? 0),
+    minutes: unknown ? 0 : (artwork.minutes ?? 0),
+    totalMinutes: unknown ? 0 : (artwork.totalMinutes ?? 0),
+    durationUnknown: unknown,
     artworkDate: artwork.artworkDate ?? null,
     notes: artwork.notes ?? '',
     favorite: Boolean(artwork.favorite),

@@ -27,9 +27,51 @@ function normalizeFolderId(value) {
   return value
 }
 
+/**
+ * Duration model: `durationUnknown` is an explicit user state ("Not sure how
+ * long this took"), stored as unknown/null — never as 0 minutes.
+ *
+ * Backward compatible: legacy records have numeric hours/minutes/totalMinutes
+ * and no flag, which normalizes to known durations. No Dexie version bump is
+ * needed because the artworks table is schemaless for non-indexed fields.
+ */
+export function isDurationUnknownRecord(data) {
+  if (!data) return false
+  if (data.durationUnknown === true) return true
+  return data.hours == null && data.minutes == null && data.totalMinutes == null
+}
+
 function normalizeArtworkData(data, existing = null) {
-  const hours = Math.max(0, Number(data.hours) || 0)
-  const minutes = Math.max(0, Math.min(59, Number(data.minutes) || 0))
+  // Explicit unknown wins; otherwise fall back to the existing flag only when
+  // the caller did not supply any duration fields (e.g. folder moves).
+  const durationUnknown =
+    data.durationUnknown === true
+      ? true
+      : data.durationUnknown === false
+        ? false
+        : data.hours === undefined && data.minutes === undefined && data.totalMinutes === undefined
+          ? Boolean(existing?.durationUnknown)
+          : false
+
+  if (durationUnknown) {
+    return {
+      title: (data.title ?? existing?.title ?? '').trim(),
+      mediumType: normalizeMediumType(data.mediumType ?? existing?.mediumType, existing),
+      medium: ((data.medium ?? existing?.medium ?? '') || '').trim(),
+      folderId: normalizeFolderId(data.folderId !== undefined ? data.folderId : existing?.folderId),
+      status: data.status ?? existing?.status ?? 'In Progress',
+      hours: null,
+      minutes: null,
+      totalMinutes: null,
+      durationUnknown: true,
+      artworkDate: (data.artworkDate !== undefined ? data.artworkDate : existing?.artworkDate) || null,
+      notes: data.notes ?? existing?.notes ?? '',
+      favorite: Boolean(data.favorite ?? existing?.favorite ?? false),
+    }
+  }
+
+  const hours = Math.max(0, Number(data.hours ?? existing?.hours ?? 0) || 0)
+  const minutes = Math.max(0, Math.min(59, Number(data.minutes ?? existing?.minutes ?? 0) || 0))
 
   return {
     title: (data.title || '').trim(),
@@ -40,6 +82,7 @@ function normalizeArtworkData(data, existing = null) {
     hours,
     minutes,
     totalMinutes: calculateTotalMinutes(hours, minutes),
+    durationUnknown: false,
     artworkDate: data.artworkDate || null,
     notes: data.notes || '',
     favorite: Boolean(data.favorite),
@@ -49,10 +92,21 @@ function normalizeArtworkData(data, existing = null) {
 function normalizeArtworkRecord(artwork) {
   if (!artwork) return artwork
 
+  const unknown =
+    artwork.durationUnknown === true ||
+    (artwork.durationUnknown !== false &&
+      artwork.hours == null &&
+      artwork.minutes == null &&
+      artwork.totalMinutes == null)
   const normalized = {
     ...artwork,
     mediumType: resolveMediumType(artwork),
     folderId: artwork.folderId ?? null,
+    // Preserve explicit unknown; legacy numeric rows stay known.
+    durationUnknown: unknown,
+    hours: unknown ? null : (artwork.hours ?? 0),
+    minutes: unknown ? null : (artwork.minutes ?? 0),
+    totalMinutes: unknown ? null : (artwork.totalMinutes ?? 0),
   }
   delete normalized.type
   delete normalized.category
@@ -231,12 +285,22 @@ export async function getStats() {
   let digitalMinutes = 0
   let traditionalMinutes = 0
   let otherMinutes = 0
+  let trackedCount = 0
+  let unknownCount = 0
 
   for (const artwork of artworks) {
     if (artwork.status === 'Finished') finished++
     else inProgress++
 
-    const minutes = artwork.totalMinutes || 0
+    // Unknown-duration artworks count as artworks but contribute no minutes:
+    // they must not lower totals or averages.
+    if (artwork.durationUnknown || artwork.totalMinutes == null) {
+      unknownCount += 1
+      continue
+    }
+
+    const minutes = Math.max(0, Number(artwork.totalMinutes) || 0)
+    trackedCount += 1
     totalMinutes += minutes
 
     const mediumType = resolveMediumType(artwork)
@@ -244,6 +308,8 @@ export async function getStats() {
     else if (mediumType === 'Traditional') traditionalMinutes += minutes
     else otherMinutes += minutes
   }
+
+  const averageMinutes = trackedCount > 0 ? totalMinutes / trackedCount : 0
 
   return {
     totalArtworks: artworks.length,
@@ -253,5 +319,8 @@ export async function getStats() {
     digitalMinutes,
     traditionalMinutes,
     otherMinutes,
+    trackedCount,
+    unknownCount,
+    averageMinutes,
   }
 }

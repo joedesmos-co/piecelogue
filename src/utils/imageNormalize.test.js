@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   ImageNormalizeError,
+  THUMBNAIL_MAX_EDGE,
   computeScaledSize,
   detectSourceImageFormat,
   isAcceptedImportFile,
@@ -122,7 +123,7 @@ describe('normalizeArtworkImage', () => {
     assert.ok(result.original.size > 0)
     assert.ok(result.thumbnail.size > 0)
     assert.equal(result.width, 800)
-    assert.equal(result.thumbnailWidth <= 400, true)
+    assert.equal(result.thumbnailWidth <= THUMBNAIL_MAX_EDGE, true)
   })
 
   it('normalizes PNG into JPEG', async () => {

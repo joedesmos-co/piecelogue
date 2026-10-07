@@ -123,6 +123,53 @@ describe('cloud library row mapping', () => {
   })
 })
 
+describe('cloud unknown-duration mapping', () => {
+  it('round-trips the durationUnknown flag without leaking 0 minutes', () => {
+    const unknown = mapCloudArtworkRow({
+      id: 'art-9',
+      folder_id: null,
+      title: 'Unsure',
+      medium_type: 'Digital',
+      medium: '',
+      status: 'Finished',
+      hours: 0,
+      minutes: 0,
+      total_minutes: 0,
+      duration_unknown: 1,
+      artwork_date: null,
+      notes: '',
+      favorite: 0,
+      original_object_key: null,
+      thumbnail_object_key: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(unknown.durationUnknown, true)
+    assert.equal(unknown.totalMinutes, 0)
+
+    const legacy = mapCloudArtworkRow({
+      id: 'art-8',
+      folder_id: null,
+      title: 'Legacy',
+      medium_type: 'Digital',
+      medium: '',
+      status: 'Finished',
+      hours: 0,
+      minutes: 0,
+      total_minutes: 0,
+      duration_unknown: 0,
+      artwork_date: null,
+      notes: '',
+      favorite: 0,
+      original_object_key: null,
+      thumbnail_object_key: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-02T00:00:00.000Z',
+    })
+    assert.equal(legacy.durationUnknown, false)
+  })
+})
+
 describe('cloud artwork metadata upsert', () => {
   it('preserves R2 object keys on metadata-only SQL updates', async () => {
     const { readFileSync } = await import('node:fs')

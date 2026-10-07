@@ -46,18 +46,27 @@ export async function saveRestoredArtworkImage(artworkId, imageType, blob) {
   }
 
   const kind = imageType === 'thumbnail' ? IMAGE_KINDS.THUMBNAIL : IMAGE_KINDS.ORIGINAL
-  const normalized = await normalizeArtworkImage(blob)
 
-  if (kind === IMAGE_KINDS.ORIGINAL) {
-    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, normalized.original)
-    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
-    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
-    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+  // Store cloud bytes verbatim: re-encoding an already-encoded JPEG thumbnail
+  // (thumbnail-from-thumbnail) adds a second generation of JPEG loss and
+  // was a source of soft/grainy gallery previews after restore.
+  if (kind === IMAGE_KINDS.THUMBNAIL) {
+    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, blob)
+    await clearImageRecoveryRequired(artworkId, kind)
     return
   }
 
-  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
-  await clearImageRecoveryRequired(artworkId, kind)
+  // Originals are stored verbatim too; the gallery thumbnail is derived from
+  // the original in a single encode so detail stays pixel-identical to cloud.
+  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, blob)
+  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
+  try {
+    const normalized = await normalizeArtworkImage(blob)
+    await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
+    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+  } catch {
+    // Keep the original; thumbnail can be repaired later.
+  }
 }
 
 export async function saveRestoredArtworkImageBytes(artworkId, imageType, bytes, mimeType) {

@@ -20,3 +20,26 @@ export function calculateTotalMinutes(hours, minutes) {
   const m = Math.max(0, Math.min(59, Number(minutes) || 0))
   return h * 60 + m
 }
+
+/** Canonical "unknown duration" label used on cards and detail. */
+export const UNKNOWN_DURATION_LABEL = 'Time unknown'
+
+export function isDurationUnknown(artworkOrMinutes, durationUnknownFlag) {
+  if (typeof artworkOrMinutes === 'object' && artworkOrMinutes !== null) {
+    return Boolean(artworkOrMinutes.durationUnknown) || artworkOrMinutes.totalMinutes == null
+  }
+  if (typeof durationUnknownFlag === 'boolean') return durationUnknownFlag
+  return false
+}
+
+/**
+ * Display string for an artwork's duration:
+ * - unknown -> "Time unknown"
+ * - known -> formatTime(totalMinutes)
+ * Pure helper for cards, detail, and stats.
+ */
+export function formatArtworkDuration(artwork) {
+  if (!artwork) return UNKNOWN_DURATION_LABEL
+  if (isDurationUnknown(artwork)) return UNKNOWN_DURATION_LABEL
+  return formatTime(artwork.totalMinutes ?? 0)
+}

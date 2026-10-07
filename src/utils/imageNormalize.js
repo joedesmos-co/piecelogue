@@ -24,9 +24,39 @@ export class ImageImportError extends ImageNormalizeError {
 }
 
 export const ORIGINAL_JPEG_QUALITY = 0.92
-export const THUMBNAIL_JPEG_QUALITY = 0.85
-export const THUMBNAIL_MAX_EDGE = 400
+export const THUMBNAIL_JPEG_QUALITY = 0.84
+/**
+ * Retina-aware gallery thumbnail edge.
+ *
+ * Largest gallery cards render at ~185-250 CSS px. At DPR 3 (modern iPhone)
+ * that needs ~555-750 device px. 640px covers the common 2-column mobile
+ * layout (~166 CSS px -> ~500 device px) plus desktop densities, while
+ * staying ~2x smaller than a full original. Gallery must never upscale this
+ * beyond its intrinsic size.
+ */
+export const THUMBNAIL_MAX_EDGE = 640
 export const MAX_ORIGINAL_EDGE = 4096
+
+/**
+ * Minimum thumbnail edge that keeps a card crisp for a given layout.
+ * Pure helper so gesture/source-selection logic stays testable.
+ */
+export function getRequiredThumbnailEdge(displayCssWidth, devicePixelRatio = 1) {
+  const css = Math.max(1, Number(displayCssWidth) || 0)
+  const dpr = Math.min(4, Math.max(1, Number(devicePixelRatio) || 1))
+  return Math.ceil(css * dpr)
+}
+
+/**
+ * True when rendering a thumbnail at the given CSS size + DPR would upscale
+ * it (the graininess trigger). Gallery code should prefer a larger source
+ * (or the original) instead of stretching in that case.
+ */
+export function isThumbnailUpscaled(thumbnailWidth, displayCssWidth, devicePixelRatio = 1) {
+  const thumb = Number(thumbnailWidth) || 0
+  if (!thumb) return true
+  return getRequiredThumbnailEdge(displayCssWidth, devicePixelRatio) > thumb
+}
 
 const IMAGE_EXTENSIONS = new Set([
   '.jpg',
