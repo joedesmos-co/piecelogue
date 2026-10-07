@@ -4,7 +4,7 @@ import { CONTACT_EMAIL } from '../../utils/site'
 
 export default function TermsPage() {
   return (
-    <PublicPageLayout title="Terms of Service">
+    <PublicPageLayout title="Terms of Service" variant="legal">
       <p>
         These Terms of Service govern your use of {APP_NAME} at piecelogue.com, including the
         local-first web app at /app. By using the site or app, you agree to these terms.

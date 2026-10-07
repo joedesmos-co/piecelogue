@@ -24,7 +24,7 @@ function getInitialPage() {
 }
 
 function AppContent() {
-  const { addArtwork, editArtwork, folders } = useArtworks()
+  const { addArtwork, editArtwork, folders, artworks } = useArtworks()
   const [currentPage, setCurrentPage] = useState(getInitialPage)
   const [showForm, setShowForm] = useState(false)
   const [editingArtwork, setEditingArtwork] = useState(null)
@@ -85,6 +85,7 @@ function AppContent() {
         currentPage={currentPage}
         onNavigate={setCurrentPage}
         onAdd={() => handleAdd(null)}
+        hideAdd={currentPage === PAGES.GALLERY && artworks.length === 0}
       >
         {renderPage()}
       </AppShell>

@@ -1,13 +1,9 @@
 import { useRef, useState } from 'react'
 import {
   ArrowLeft,
-  Clock,
   Edit,
-  Heart,
+  Star,
   Trash2,
-  Calendar,
-  Tag,
-  Layers,
   Maximize2,
   ImagePlus,
 } from 'lucide-react'
@@ -20,17 +16,7 @@ import { repairArtworkImage } from '../db/artworkService'
 import { formatUserError } from '../utils/userErrors'
 import ArtworkImage from './ArtworkImage'
 import ImageLightbox from './ImageLightbox'
-
-function DetailRow({ icon: Icon, label, value }) {
-  if (!value) return null
-  return (
-    <div className="detail-row">
-      <Icon size={16} className="detail-row-icon" aria-hidden="true" />
-      <span className="detail-row-label">{label}</span>
-      <span className="detail-row-value">{value}</span>
-    </div>
-  )
-}
+import { CatalogMeta, PaperPanel, PrintFrame, TapeStrip } from './StudioKit'
 
 export default function ArtworkDetail({
   artwork,
@@ -85,63 +71,40 @@ export default function ArtworkDetail({
     <div className="artwork-detail">
       <header className="detail-header">
         <button type="button" className="btn btn--ghost" onClick={onBack}>
-          <ArrowLeft size={18} />
-          Back
+          <ArrowLeft size={18} aria-hidden="true" />
+          Back to Gallery
         </button>
-        <div className="detail-actions">
-          <button
-            type="button"
-            className={`icon-btn ${artwork.favorite ? 'icon-btn--active' : ''}`}
-            onClick={() => onToggleFavorite(artwork)}
-            aria-label={artwork.favorite ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            <Heart size={20} fill={artwork.favorite ? 'currentColor' : 'none'} />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={() => onEdit(artwork)}
-            aria-label="Edit artwork"
-          >
-            <Edit size={20} />
-          </button>
-          <button
-            type="button"
-            className="icon-btn icon-btn--danger"
-            onClick={() => onDelete(artwork)}
-            aria-label="Delete artwork"
-          >
-            <Trash2 size={20} />
-          </button>
-        </div>
       </header>
 
       <div className="detail-content">
         <div className="detail-image-wrap">
-          <button
-            ref={imageTriggerRef}
-            type="button"
-            className="detail-image-button"
-            onClick={() => setLightboxOpen(true)}
-            aria-label="View artwork full screen"
-            disabled={!imageBlob}
-          >
-            <ArtworkImage
-              artwork={artwork}
-              mode="detail"
-              alt={artwork.title}
-              className="detail-image"
-              fallbackClassName="detail-image-placeholder"
-              iconSize={36}
-            />
-            {imageBlob && (
-              <span className="detail-image-expand" aria-hidden="true">
-                <Maximize2 size={18} />
-              </span>
-            )}
-          </button>
+          <PrintFrame label="Mounted print">
+            <button
+              ref={imageTriggerRef}
+              type="button"
+              className="detail-image-button"
+              onClick={() => setLightboxOpen(true)}
+              aria-label="View artwork full screen"
+              disabled={!imageBlob}
+            >
+              <ArtworkImage
+                artwork={artwork}
+                mode="detail"
+                alt={artwork.title}
+                className="detail-image"
+                fallbackClassName="detail-image-placeholder"
+                iconSize={36}
+              />
+              {imageBlob && (
+                <span className="detail-image-expand" aria-hidden="true">
+                  <Maximize2 size={18} />
+                </span>
+              )}
+            </button>
+          </PrintFrame>
+
           {imageUnavailable ? (
-            <div className="detail-image-repair">
+            <PaperPanel tone="charcoal" className="detail-repair-sheet" style={{ padding: '18px' }}>
               <p className="settings-text settings-text--muted">
                 This image can no longer be read on this device. Re-select the image to repair it.
               </p>
@@ -168,51 +131,70 @@ export default function ArtworkDetail({
                   }}
                 />
               </label>
-            </div>
+            </PaperPanel>
           ) : null}
         </div>
 
         <div className="detail-info">
-          <h1 className="detail-title">{artwork.title}</h1>
-
-          <div className="detail-badges">
-            <span
-              className={`badge badge--status badge--${artwork.status === 'Finished' ? 'finished' : 'progress'}`}
-            >
-              {artwork.status}
-            </span>
-          </div>
-
-          <div className="detail-rows">
-            <DetailRow
-              icon={Tag}
-              label="Medium Type"
-              value={resolveMediumType(artwork)}
-            />
-            {artwork.medium && (
-              <DetailRow icon={Tag} label="Medium" value={artwork.medium} />
-            )}
-            {folderName && (
-              <DetailRow icon={Layers} label="Folder" value={folderName} />
-            )}
-            {artwork.totalMinutes > 0 && (
-              <DetailRow
-                icon={Clock}
-                label="Time spent"
-                value={formatTime(artwork.totalMinutes)}
-              />
-            )}
-            {formattedDate && (
-              <DetailRow icon={Calendar} label="Artwork date" value={formattedDate} />
-            )}
-          </div>
-
-          {artwork.notes && (
-            <div className="detail-notes">
-              <h3 className="detail-notes-title">Notes</h3>
-              <p className="detail-notes-text">{artwork.notes}</p>
+          <PaperPanel className="detail-placard">
+            <div className="detail-placard-top">
+              <div>
+                <p className="studio-label studio-label--muted">Catalog record</p>
+                <h1 className="detail-title">{artwork.title}</h1>
+              </div>
+              <button
+                type="button"
+                className={`icon-btn detail-favorite ${artwork.favorite ? 'icon-btn--active' : ''}`}
+                onClick={() => onToggleFavorite(artwork)}
+                aria-label={artwork.favorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star size={20} fill={artwork.favorite ? 'currentColor' : 'none'} />
+              </button>
             </div>
-          )}
+
+            <div className="detail-badges">
+              <span
+                className={`badge badge--status badge--${artwork.status === 'Finished' ? 'finished' : 'progress'}`}
+              >
+                {artwork.status}
+              </span>
+            </div>
+
+            <CatalogMeta
+              items={[
+                { label: 'Medium type', value: resolveMediumType(artwork) },
+                artwork.medium ? { label: 'Medium', value: artwork.medium } : null,
+                folderName ? { label: 'Folder', value: folderName } : null,
+                artwork.totalMinutes > 0
+                  ? { label: 'Time spent', value: formatTime(artwork.totalMinutes) }
+                  : null,
+                formattedDate ? { label: 'Artwork date', value: formattedDate } : null,
+              ]}
+            />
+
+            <div className="detail-actions">
+              <button type="button" className="btn btn--primary" onClick={() => onEdit(artwork)}>
+                <Edit size={18} aria-hidden="true" />
+                Edit artwork
+              </button>
+              <button
+                type="button"
+                className="btn btn--danger"
+                onClick={() => onDelete(artwork)}
+              >
+                <Trash2 size={18} aria-hidden="true" />
+                Delete
+              </button>
+            </div>
+          </PaperPanel>
+
+          {artwork.notes ? (
+            <div className="detail-note-sheet studio-panel">
+              <TapeStrip angle={-6} />
+              <p className="detail-note-kicker">Studio note</p>
+              <p className="detail-note-text">{artwork.notes}</p>
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -8,6 +8,7 @@ import {
 } from '../utils/localBackup'
 import { formatUserError } from '../utils/userErrors'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { StudioHeading } from '../components/StudioKit'
 
 export default function SettingsPage() {
   const fileInputRef = useRef(null)
@@ -78,10 +79,11 @@ export default function SettingsPage() {
 
   return (
     <div className="page settings-page">
-      <header className="page-header">
-        <h2 className="page-title">Settings</h2>
-        <p className="page-subtitle">App preferences and information</p>
-      </header>
+      <StudioHeading
+        kicker="Piecelogue"
+        title="Studio Settings"
+        note="Quiet controls. Your work stays yours."
+      />
 
       <section className="settings-section">
         <h3 className="settings-section-title">

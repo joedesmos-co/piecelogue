@@ -3,7 +3,7 @@ import { APP_NAME } from '../../utils/constants'
 
 export default function AboutPage() {
   return (
-    <PublicPageLayout title={`About ${APP_NAME}`}>
+    <PublicPageLayout title={`About ${APP_NAME}`} variant="studio">
       <p>
         {APP_NAME} is a local-first web app for artists who want a simple place to
         log artwork, organize it into folders, and track the time spent creating.

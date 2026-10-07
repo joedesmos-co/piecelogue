@@ -3,7 +3,7 @@ import { APP_ROUTE } from '../utils/site'
 import NavLink from './NavLink'
 import SiteFooter from './SiteFooter'
 
-export default function PublicPageLayout({ title, children }) {
+export default function PublicPageLayout({ title, children, variant = 'editorial' }) {
   return (
     <div className="public-site">
       <header className="public-header">
@@ -11,13 +11,13 @@ export default function PublicPageLayout({ title, children }) {
           <span className="public-brand-name">{APP_NAME}</span>
           <span className="public-brand-tagline">{APP_TAGLINE}</span>
         </NavLink>
-        <NavLink href={APP_ROUTE} className="btn btn--public btn--secondary btn--sm public-open-app">
-          Open App
+        <NavLink href={APP_ROUTE} className="btn btn--action btn--sm public-open-app">
+          Open Piecelogue
         </NavLink>
       </header>
 
       <main className="public-main">
-        <article className="public-page">
+        <article className={`public-page public-page--${variant}`}>
           <h1 className="public-page-title">{title}</h1>
           <div className="public-page-content">{children}</div>
         </article>

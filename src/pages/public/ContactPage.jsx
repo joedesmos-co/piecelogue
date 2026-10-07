@@ -4,7 +4,7 @@ import { CONTACT_EMAIL } from '../../utils/site'
 
 export default function ContactPage() {
   return (
-    <PublicPageLayout title="Contact">
+    <PublicPageLayout title="Contact" variant="studio">
       <p>
         Have a question about {APP_NAME}, privacy, cloud sync, or how the local-first app works?
         We&apos;d like to hear from you.

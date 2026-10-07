@@ -14,6 +14,18 @@ import ArtworkImage from './ArtworkImage'
 import SegmentedControl from './SegmentedControl'
 import FolderSelect from './FolderSelect'
 
+function WorksheetSection({ index, title, tone = '', children }) {
+  return (
+    <section className={`worksheet-section ${tone ? `worksheet-section--${tone}` : ''}`}>
+      <p className="worksheet-legend">
+        <span className="worksheet-legend-index">{index}</span>
+        {title}
+      </p>
+      {children}
+    </section>
+  )
+}
+
 export default function ArtworkForm({
   artwork,
   folders = [],
@@ -143,133 +155,98 @@ export default function ArtworkForm({
         </div>
       )}
 
-      <div className="form-group">
-        <label htmlFor="artwork-image" className="form-label form-label--required">
-          Artwork Image
-        </label>
-        <div className="image-upload">
-          {newImagePreview ? (
-            <div className="image-preview-wrap">
-              <img
-                src={newImagePreview}
-                alt="Preview"
-                className="image-preview"
-              />
-              <label htmlFor="artwork-image" className="image-change-btn">
-                Change image
+      <WorksheetSection index="01" title="Artwork" tone="mount">
+        <div className="form-group">
+          <label htmlFor="artwork-image" className="form-label form-label--required">
+            Artwork image
+          </label>
+          <div className="image-upload">
+            {newImagePreview ? (
+              <div className="image-preview-wrap">
+                <img
+                  src={newImagePreview}
+                  alt="Preview"
+                  className="image-preview"
+                />
+                <label htmlFor="artwork-image" className="image-change-btn">
+                  Change image
+                </label>
+              </div>
+            ) : isEditing && existingImageBlobs ? (
+              <div className="image-preview-wrap">
+                <ArtworkImage
+                  artwork={existingImageBlobs}
+                  mode="detail"
+                  alt="Preview"
+                  className="image-preview"
+                  fallbackClassName="image-preview image-preview--fallback"
+                  iconSize={32}
+                />
+                <label htmlFor="artwork-image" className="image-change-btn">
+                  Change image
+                </label>
+              </div>
+            ) : (
+              <label htmlFor="artwork-image" className="image-upload-area">
+                <ImagePlus size={32} strokeWidth={1.5} />
+                <span>Tap to mount an image</span>
               </label>
-            </div>
-          ) : isEditing && existingImageBlobs ? (
-            <div className="image-preview-wrap">
-              <ArtworkImage
-                artwork={existingImageBlobs}
-                mode="detail"
-                alt="Preview"
-                className="image-preview"
-                fallbackClassName="image-preview image-preview--fallback"
-                iconSize={32}
-              />
-              <label htmlFor="artwork-image" className="image-change-btn">
-                Change image
-              </label>
-            </div>
-          ) : (
-            <label htmlFor="artwork-image" className="image-upload-area">
-              <ImagePlus size={32} strokeWidth={1.5} />
-              <span>Tap to add image</span>
-            </label>
-          )}
+            )}
+            <input
+              id="artwork-image"
+              type="file"
+              accept="image/*,.heic,.heif"
+              onChange={handleImageChange}
+              className="sr-only"
+            />
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="artwork-title" className="form-label form-label--required">
+            Title
+          </label>
           <input
-            id="artwork-image"
-            type="file"
-            accept="image/*,.heic,.heif"
-            onChange={handleImageChange}
-            className="sr-only"
+            id="artwork-title"
+            type="text"
+            className="form-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Give your artwork a name"
+            required
           />
         </div>
-      </div>
+      </WorksheetSection>
 
-      <div className="form-group">
-        <label htmlFor="artwork-title" className="form-label form-label--required">
-          Title
-        </label>
-        <input
-          id="artwork-title"
-          type="text"
-          className="form-input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Give your artwork a name"
+      <WorksheetSection index="02" title="Classification">
+        <SegmentedControl
+          label="Medium type"
+          labelId="medium-type-label"
+          options={MEDIUM_TYPES}
+          value={mediumType}
+          onChange={setMediumType}
+          columns={3}
           required
         />
-      </div>
-
-      <SegmentedControl
-        label="Medium Type"
-        labelId="medium-type-label"
-        options={MEDIUM_TYPES}
-        value={mediumType}
-        onChange={setMediumType}
-        columns={3}
-        required
-      />
-
-      <div className="form-group">
-        <label htmlFor="artwork-medium" className="form-label">
-          Medium
-        </label>
-        <input
-          id="artwork-medium"
-          type="text"
-          className="form-input"
-          list="medium-suggestions"
-          value={medium}
-          onChange={(e) => setMedium(e.target.value)}
-          placeholder="e.g. Pencil, Procreate, Watercolor"
-        />
-        <datalist id="medium-suggestions">
-          {MEDIUM_SUGGESTIONS.map((suggestion) => (
-            <option key={suggestion} value={suggestion} />
-          ))}
-        </datalist>
-      </div>
-
-      <FolderSelect
-        folders={folderOptions}
-        value={folderId || ''}
-        onChange={setFolderId}
-      />
-
-      <div className="form-row form-row--three form-row--time">
-        <div className="form-group">
-          <label htmlFor="artwork-hours" className="form-label">
-            Hours
-          </label>
-          <input
-            id="artwork-hours"
-            type="number"
-            className="form-input"
-            value={hours}
-            onChange={handleHoursChange}
-            min="0"
-            placeholder="0"
-          />
-        </div>
 
         <div className="form-group">
-          <label htmlFor="artwork-minutes" className="form-label">
-            Minutes
+          <label htmlFor="artwork-medium" className="form-label">
+            Medium
           </label>
           <input
-            id="artwork-minutes"
-            type="number"
+            id="artwork-medium"
+            type="text"
             className="form-input"
-            value={minutes}
-            onChange={handleMinutesChange}
-            min="0"
-            max="59"
-            placeholder="0"
+            list="medium-suggestions"
+            value={medium}
+            onChange={(e) => setMedium(e.target.value)}
+            placeholder="e.g. Pencil, Procreate, Watercolor"
           />
+          <datalist id="medium-suggestions">
+            {MEDIUM_SUGGESTIONS.map((suggestion) => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
         </div>
 
         <SegmentedControl
@@ -279,36 +256,78 @@ export default function ArtworkForm({
           value={status}
           onChange={setStatus}
           columns={2}
-          compact
         />
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="artwork-date" className="form-label">
-          Artwork Date
-        </label>
-        <input
-          id="artwork-date"
-          type="date"
-          className="form-input"
-          value={artworkDate}
-          onChange={(e) => setArtworkDate(e.target.value)}
+        <FolderSelect
+          folders={folderOptions}
+          value={folderId || ''}
+          onChange={setFolderId}
         />
-      </div>
+      </WorksheetSection>
 
-      <div className="form-group">
-        <label htmlFor="artwork-notes" className="form-label">
-          Notes
-        </label>
-        <textarea
-          id="artwork-notes"
-          className="form-textarea"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Thoughts, techniques, or progress notes..."
-          rows={3}
-        />
-      </div>
+      <WorksheetSection index="03" title="Time">
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="artwork-hours" className="form-label">
+              Hours
+            </label>
+            <input
+              id="artwork-hours"
+              type="number"
+              className="form-input"
+              value={hours}
+              onChange={handleHoursChange}
+              min="0"
+              placeholder="0"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="artwork-minutes" className="form-label">
+              Minutes
+            </label>
+            <input
+              id="artwork-minutes"
+              type="number"
+              className="form-input"
+              value={minutes}
+              onChange={handleMinutesChange}
+              min="0"
+              max="59"
+              placeholder="0"
+            />
+          </div>
+        </div>
+      </WorksheetSection>
+
+      <WorksheetSection index="04" title="Details">
+        <div className="form-group">
+          <label htmlFor="artwork-date" className="form-label">
+            Artwork date
+          </label>
+          <input
+            id="artwork-date"
+            type="date"
+            className="form-input"
+            value={artworkDate}
+            onChange={(e) => setArtworkDate(e.target.value)}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="artwork-notes" className="form-label">
+            Notes
+          </label>
+          <textarea
+            id="artwork-notes"
+            className="form-textarea"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Thoughts, techniques, or progress notes..."
+            rows={3}
+          />
+        </div>
+      </WorksheetSection>
 
       <div className="form-actions">
         <button
@@ -319,8 +338,8 @@ export default function ArtworkForm({
         >
           Cancel
         </button>
-        <button type="submit" className="btn btn--primary" disabled={saving}>
-          {saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Add Artwork'}
+        <button type="submit" className="btn btn--action" disabled={saving}>
+          {saving ? 'Saving...' : isEditing ? 'Save changes' : 'Add artwork'}
         </button>
       </div>
     </form>

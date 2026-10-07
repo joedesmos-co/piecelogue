@@ -364,14 +364,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
               <h1 className="gallery-title">{pageTitle}</h1>
               <BrushMark className="gallery-title-stroke" />
             </div>
-            {view === GALLERY_VIEWS.HOME && (
-              <p className="gallery-handwritten-note">
-                Your work,
-                <br />
-                <span>all in one place.</span>
-                <ArrowUpRight size={24} aria-hidden="true" />
-              </p>
-            )}
+
           </div>
         </div>
 
@@ -550,8 +543,7 @@ export default function GalleryPage({ onAdd, onEdit }) {
                 visibleChildFolders.length === 0 ? (
                   <EmptyState
                     title="Room for something good."
-                    message={`Add artwork to “${selectedFolder?.name}” or create a subfolder.`}
-                    note="Keep the ideas together."
+                    message={`Add artwork to "${selectedFolder?.name}" or create a subfolder.`}
                     actionLabel="Add artwork to folder"
                     onAdd={() => onAdd(currentFolderId)}
                   />
@@ -569,7 +561,6 @@ export default function GalleryPage({ onAdd, onEdit }) {
                       ? 'Pieces without a folder appear here. Add artwork from the Gallery or move items out of folders.'
                       : 'Your artwork is tucked into folders. Open one above to see your work, or add a new unfiled piece.'
                   }
-                  note="Your collection is taking shape."
                   actionLabel="Add unfiled artwork"
                   onAdd={
                     view === GALLERY_VIEWS.UNFILED

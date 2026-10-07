@@ -1,60 +1,57 @@
 import { useEffect } from 'react'
-import {
-  BarChart3,
-  Clock,
-  FolderOpen,
-  ImagePlus,
-  Layers,
-  Sparkles,
-} from 'lucide-react'
 import { APP_ROUTE, PAGE_SEO, PUBLIC_ROUTES } from '../../utils/site'
 import { applyPageSeo } from '../../utils/seo'
 import { scrollToElement } from '../../utils/navigation'
 import HomeStructuredData from '../../components/HomeStructuredData'
 import NavLink from '../../components/NavLink'
 import SiteFooter from '../../components/SiteFooter'
+import { TapeStrip } from '../../components/StudioKit'
 import LandingHeader from '../../components/landing/LandingHeader'
 import ProductPreview from '../../components/landing/ProductPreview'
 import '../../styles/landing.css'
 
 const FEATURES = [
   {
-    icon: ImagePlus,
     title: 'Log every piece',
     text: 'Save artwork, medium, status, date, notes, and time spent.',
   },
   {
-    icon: FolderOpen,
+    title: 'Keep the images',
+    text: 'Your images live with the record, ready to open and revisit.',
+  },
+  {
     title: 'Organize your work',
-    text: 'Keep artwork arranged in folders without losing sight of unfiled pieces.',
+    text: 'Arrange artwork in folders without losing sight of unfiled pieces.',
   },
   {
-    icon: Clock,
     title: 'Track your time',
-    text: 'See how much time you have invested across Digital, Traditional, and Other mediums.',
+    text: 'See the hours invested across Digital, Traditional, and Other mediums.',
   },
   {
-    icon: BarChart3,
-    title: 'See your progress',
-    text: 'Build a personal visual history of finished work, works in progress, favorites, and lifetime creative time.',
+    title: 'Review your history',
+    text: 'A personal visual history of finished work, works in progress, and favorites.',
+  },
+  {
+    title: 'Sync when you want',
+    text: 'Local-first by default, with optional private cloud backup across devices.',
   },
 ]
 
 const STEPS = [
   {
-    number: '1',
+    number: '01',
     title: 'Add your artwork',
     text: 'Upload an image and record the details that matter to you.',
   },
   {
-    number: '2',
+    number: '02',
     title: 'Organize and update',
     text: 'Use folders, status, favorites, notes, and editing as your work develops.',
   },
   {
-    number: '3',
-    title: 'Watch your creative record grow',
-    text: 'Piecelogue calculates your artwork totals and creative time automatically.',
+    number: '03',
+    title: 'Watch your record grow',
+    text: 'Piecelogue totals your artwork and creative time automatically.',
   },
 ]
 
@@ -74,135 +71,125 @@ export default function LandingPage() {
       <LandingHeader />
 
       <main>
-        <section className="landing-hero" aria-labelledby="landing-hero-heading">
-          <div className="landing-hero-content landing-animate">
-            <p className="landing-eyebrow">
-              <Sparkles size={16} aria-hidden="true" />
-              A personal record of your creative work
-            </p>
-            <h1 id="landing-hero-heading" className="landing-hero-title">
-              Log your art.
+        <section className="zine-hero" aria-labelledby="landing-hero-heading">
+          <div className="zine-hero-copy landing-animate">
+            <p className="zine-eyebrow">A personal record of your creative work</p>
+            <h1 id="landing-hero-heading" className="zine-hero-title">
+              Your art
               <br />
-              Track your journey.
+              deserves
+              <br />
+              <span className="zine-hero-title-accent">a record.</span>
             </h1>
-            <p className="landing-hero-text">
-              Piecelogue helps artists save their work, organize pieces into
-              folders, record time spent creating, and see their progress grow
-              over time.
+            <p className="zine-hero-sub">
+              Piecelogue helps artists save their work, organize pieces into folders,
+              record time spent creating, and see their progress grow over time.
             </p>
-            <div className="landing-hero-actions">
-              <NavLink href={APP_ROUTE} className="btn btn--public btn--primary landing-hero-cta">
+            <div className="zine-hero-actions">
+              <NavLink href={APP_ROUTE} className="btn btn--action zine-cta">
                 Open Piecelogue
               </NavLink>
-              <NavLink href="#how-it-works" className="btn btn--public btn--secondary landing-hero-cta">
+              <NavLink href="#how-it-works" className="btn btn--secondary zine-cta">
                 See how it works
               </NavLink>
             </div>
+            <ul className="zine-hero-points">
+              <li>Log artwork</li>
+              <li>Keep images</li>
+              <li>Organize folders</li>
+              <li>Track time</li>
+              <li>Local-first</li>
+              <li>Optional sync</li>
+            </ul>
           </div>
 
-          <div className="landing-hero-preview landing-animate landing-animate--delay">
+          <div className="zine-hero-art landing-animate landing-animate--delay">
             <ProductPreview />
           </div>
         </section>
 
-        <section
-          id="features"
-          className="landing-section landing-features"
-          aria-labelledby="features-heading"
-        >
-          <div className="landing-section-header">
-            <h2 id="features-heading" className="landing-section-title">
-              Everything you need to track your art
+        <section id="features" className="zine-section zine-features" aria-labelledby="features-heading">
+          <header className="zine-section-head">
+            <p className="zine-kicker">Everything you need</p>
+            <h2 id="features-heading" className="zine-title">
+              A studio record, not a to-do list.
             </h2>
-            <p className="landing-section-subtitle">
-              A focused toolkit for logging, organizing, and reviewing your creative output.
-            </p>
-          </div>
+          </header>
 
-          <div className="landing-features-grid">
-            {FEATURES.map(({ icon: Icon, title, text }) => (
-              <article key={title} className="landing-feature-card">
-                <div className="landing-feature-icon" aria-hidden="true">
-                  <Icon size={22} strokeWidth={1.75} />
+          <div className="zine-feature-list">
+            {FEATURES.map((feature, index) => (
+              <article key={feature.title} className="zine-feature">
+                <span className="zine-feature-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className="zine-feature-title">{feature.title}</h3>
+                  <p className="zine-feature-text">{feature.text}</p>
                 </div>
-                <h3 className="landing-feature-title">{title}</h3>
-                <p className="landing-feature-text">{text}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section
-          id="how-it-works"
-          className="landing-section landing-steps"
-          aria-labelledby="how-heading"
-        >
-          <div className="landing-section-header">
-            <h2 id="how-heading" className="landing-section-title">
-              How it works
+        <section id="how-it-works" className="zine-section zine-steps" aria-labelledby="how-heading">
+          <header className="zine-section-head">
+            <p className="zine-kicker">How it works</p>
+            <h2 id="how-heading" className="zine-title">
+              Three steps to a creative record.
             </h2>
-            <p className="landing-section-subtitle">
-              Three simple steps to start building your creative record.
-            </p>
-          </div>
+          </header>
 
-          <ol className="landing-steps-list">
-            {STEPS.map(({ number, title, text }) => (
-              <li key={number} className="landing-step">
-                <span className="landing-step-number" aria-hidden="true">
-                  {number}
+          <ol className="zine-step-list">
+            {STEPS.map((step) => (
+              <li key={step.number} className="zine-step">
+                <span className="zine-step-number" aria-hidden="true">
+                  {step.number}
                 </span>
-                <div>
-                  <h3 className="landing-step-title">{title}</h3>
-                  <p className="landing-step-text">{text}</p>
-                </div>
+                <h3 className="zine-step-title">{step.title}</h3>
+                <p className="zine-step-text">{step.text}</p>
               </li>
             ))}
           </ol>
 
-          <div className="landing-section-cta">
-            <NavLink href={APP_ROUTE} className="btn btn--public btn--primary">
+          <div className="zine-section-cta">
+            <NavLink href={APP_ROUTE} className="btn btn--action zine-cta">
               Start logging your art
             </NavLink>
           </div>
         </section>
 
-        <section
-          className="landing-section landing-local"
-          aria-labelledby="local-heading"
-        >
-          <div className="landing-local-card">
-            <div className="landing-local-icon" aria-hidden="true">
-              <Layers size={24} strokeWidth={1.75} />
-            </div>
-            <h2 id="local-heading" className="landing-local-title">
-              Your artwork stays on your device
+        <section className="zine-section zine-local" aria-labelledby="local-heading">
+          <div className="zine-local-sheet studio-panel">
+            <TapeStrip angle={-5} />
+            <p className="zine-kicker zine-kicker--dark">Local-first</p>
+            <h2 id="local-heading" className="zine-local-title">
+              Your artwork stays on your device.
             </h2>
-            <p className="landing-local-text">
-              The current version of Piecelogue stores artwork images and metadata
-              locally in your browser using IndexedDB. No account is required today,
-              and your library does not automatically sync between browsers or devices.
+            <p className="zine-local-text">
+              The current version of Piecelogue stores artwork images and metadata locally in
+              your browser using IndexedDB. No account is required today, and your library does
+              not automatically sync between browsers or devices.
             </p>
-            <p className="landing-local-text">
-              Clearing browser or site data may remove saved artwork. Before relying
-              on Piecelogue as your only copy of a piece, keep backups of important
-              images.
+            <p className="zine-local-text">
+              Clearing browser or site data may remove saved artwork. Before relying on
+              Piecelogue as your only copy of a piece, keep backups of important images.
             </p>
-            <NavLink href={PUBLIC_ROUTES.PRIVACY} className="landing-local-link">
-              Read the Privacy Policy
+            <NavLink href={PUBLIC_ROUTES.PRIVACY} className="zine-local-link">
+              Read the Privacy Policy →
             </NavLink>
           </div>
         </section>
 
-        <section className="landing-section landing-final-cta" aria-labelledby="final-cta-heading">
-          <h2 id="final-cta-heading" className="landing-final-title">
-            Your art deserves a record
+        <section className="zine-final" aria-labelledby="final-cta-heading">
+          <p className="zine-kicker">Start today</p>
+          <h2 id="final-cta-heading" className="zine-final-title">
+            Your art deserves a record.
           </h2>
-          <p className="landing-final-text">
-            Start building a personal history of the pieces you create and the time
-            you spend creating them.
+          <p className="zine-final-text">
+            Start building a personal history of the pieces you create and the time you spend
+            creating them.
           </p>
-          <NavLink href={APP_ROUTE} className="btn btn--public btn--primary landing-final-btn">
+          <NavLink href={APP_ROUTE} className="btn btn--action zine-cta zine-final-btn">
             Open Piecelogue
           </NavLink>
         </section>

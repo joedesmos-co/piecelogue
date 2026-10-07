@@ -4,10 +4,8 @@ import {
   CheckCircle,
   Clock,
   Folder,
-  Monitor,
-  Paintbrush,
   Palette,
-  Shapes,
+  Star,
 } from 'lucide-react'
 import AccountSection from '../components/AccountSection'
 import CloudSaveSection from '../components/CloudSaveSection'
@@ -17,20 +15,17 @@ import { useAuth } from '../hooks/useAuth'
 import { getStats } from '../db/artworkService'
 import { useArtworks } from '../hooks/useArtworks'
 import LoadingState from '../components/LoadingState'
+import { StudioHeading } from '../components/StudioKit'
 import { formatTime } from '../utils/formatTime'
 import { formatUserError } from '../utils/userErrors'
 import { wasLibraryClearedOnSignOut } from '../utils/clearLocalLibrary'
 
-function StatCard({ icon: Icon, label, value, accent }) {
+function LogbookCell({ icon: Icon, label, value, tone = '' }) {
   return (
-    <div className={`stat-card ${accent ? `stat-card--${accent}` : ''}`}>
-      <div className="stat-card-icon" aria-hidden="true">
-        <Icon size={22} strokeWidth={1.75} />
-      </div>
-      <div className="stat-card-content">
-        <span className="stat-card-value">{value}</span>
-        <span className="stat-card-label">{label}</span>
-      </div>
+    <div className={`logbook-cell ${tone ? `logbook-cell--${tone}` : ''}`}>
+      <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+      <span className="logbook-cell-value">{value}</span>
+      <span className="logbook-cell-label">{label}</span>
     </div>
   )
 }
@@ -78,19 +73,29 @@ export default function ProfilePage() {
     }
   }, [artworks, shouldLoadStats])
 
+  const favoriteCount = artworks.filter((artwork) => artwork.favorite).length
+  const mediumTotal = stats
+    ? stats.traditionalMinutes + stats.digitalMinutes + stats.otherMinutes
+    : 0
+  const heroHours = stats ? Math.floor(stats.totalMinutes / 60) : 0
+  const heroMinutes = stats ? stats.totalMinutes % 60 : 0
+  const heroNumber = heroHours > 0 ? heroHours : heroMinutes
+  const heroUnit = heroHours > 0 ? 'hours' : 'minutes'
+
   return (
     <div className="page profile-page">
-      <header className="page-header">
-        <h2 className="page-title">Profile</h2>
-        <p className="page-subtitle">Your account and creative journey</p>
-      </header>
+      <StudioHeading
+        kicker="Piecelogue"
+        title="My Studio"
+        note="A record of the work I make."
+      />
 
       <AccountSection />
 
-      <section className="settings-section">
-        <h3 className="settings-section-title">
-          <BarChart3 size={18} />
-          Lifetime stats
+      <section className="settings-section" aria-labelledby="logbook-heading">
+        <h3 id="logbook-heading" className="settings-section-title">
+          <BarChart3 size={18} aria-hidden="true" />
+          Studio logbook
         </h3>
 
         {error ? (
@@ -123,62 +128,76 @@ export default function ProfilePage() {
             </div>
             <h4 className="profile-stats-empty-title">No stats yet</h4>
             <p className="settings-text settings-text--muted">
-              Add artwork from the Gallery to track finished pieces, time spent, and medium breakdowns
-              here.
+              Add artwork from the Gallery to track finished pieces, time spent, and medium
+              breakdowns here.
             </p>
           </div>
         ) : null}
 
         {shouldLoadStats && !loading && stats && stats.totalArtworks > 0 ? (
-          <div className="stats-grid">
-            <StatCard
-              icon={Clock}
-              label="Total lifetime time"
-              value={formatTime(stats.totalMinutes)}
-              accent="time"
-            />
-            <StatCard
-              icon={BarChart3}
-              label="Total artworks"
-              value={stats.totalArtworks}
-              accent="primary"
-            />
-            <StatCard
-              icon={Folder}
-              label="Total folders"
-              value={folders.length}
-              accent="primary"
-            />
-            <StatCard
-              icon={Paintbrush}
-              label="Traditional art time"
-              value={formatTime(stats.traditionalMinutes)}
-              accent="traditional"
-            />
-            <StatCard
-              icon={Monitor}
-              label="Digital art time"
-              value={formatTime(stats.digitalMinutes)}
-              accent="digital"
-            />
-            <StatCard
-              icon={Shapes}
-              label="Other art time"
-              value={formatTime(stats.otherMinutes)}
-              accent="other"
-            />
-            <StatCard
-              icon={CheckCircle}
-              label="Finished"
-              value={stats.finished}
-              accent="success"
-            />
-            <StatCard
-              icon={Clock}
-              label="In progress"
-              value={stats.inProgress}
-              accent="warning"
-            />
+          <div className="logbook">
+            <div className="logbook-hero studio-panel">
+              <p className="logbook-hero-kicker">Lifetime time in the studio</p>
+              <span className="logbook-hero-number">{heroNumber}</span>
+              <div className="logbook-hero-foot">
+                <span className="logbook-hero-label">
+                  {heroUnit} · {formatTime(stats.totalMinutes)} logged
+                </span>
+                <span className="logbook-hero-note">keep going.</span>
+              </div>
+            </div>
+
+            <div className="logbook-grid">
+              <LogbookCell
+                icon={CheckCircle}
+                label="Finished"
+                value={stats.finished}
+              />
+              <LogbookCell
+                icon={Clock}
+                label="In progress"
+                value={stats.inProgress}
+              />
+              <LogbookCell
+                icon={Folder}
+                label="Folders"
+                value={folders.length}
+              />
+              <LogbookCell
+                icon={Star}
+                label="Favorites"
+                value={favoriteCount}
+                tone="cobalt"
+              />
+            </div>
+
+            <div className="logbook-split">
+              <h4 className="logbook-split-title">Time by medium</h4>
+              {[
+                {
+                  key: 'traditional',
+                  name: 'Traditional',
+                  minutes: stats.traditionalMinutes,
+                },
+                { key: 'digital', name: 'Digital', minutes: stats.digitalMinutes },
+                { key: 'other', name: 'Other', minutes: stats.otherMinutes },
+              ].map((row) => (
+                <div key={row.key} className={`logbook-bar-row logbook-bar-row--${row.key}`}>
+                  <span className="logbook-bar-name">{row.name}</span>
+                  <span className="logbook-bar-track">
+                    <span
+                      className="logbook-bar-fill"
+                      style={{
+                        width: mediumTotal > 0 ? `${(row.minutes / mediumTotal) * 100}%` : '0%',
+                      }}
+                    />
+                  </span>
+                  <span className="logbook-bar-value">
+                    {row.minutes > 0 ? formatTime(row.minutes) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
       </section>

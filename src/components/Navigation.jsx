@@ -1,7 +1,7 @@
 import { Images, User, Settings, Plus } from 'lucide-react'
 import { APP_NAME, PAGES } from '../utils/constants'
 import { navigate } from '../utils/navigation'
-import { BrushMark, SketchArrow } from './StudioMarks'
+import { BrushMark } from './StudioMarks'
 
 const NAV_ITEMS = [
   { id: PAGES.GALLERY, label: 'Gallery', icon: Images },
@@ -28,7 +28,7 @@ export function BottomNav({ currentPage, onNavigate }) {
   )
 }
 
-export function Sidebar({ currentPage, onNavigate, onAdd }) {
+export function Sidebar({ currentPage, onNavigate, onAdd, hideAdd = false }) {
   return (
     <aside className="sidebar" aria-label="Main navigation">
       <div className="sidebar-brand">
@@ -41,13 +41,6 @@ export function Sidebar({ currentPage, onNavigate, onAdd }) {
           <span className="brand-wordmark">{APP_NAME}</span>
           <BrushMark className="brand-underline" />
         </button>
-        <p className="sidebar-tagline">
-          Your work.
-          <br />
-          Your story.
-          <br />
-          All in one place.
-        </p>
       </div>
 
       <nav className="sidebar-nav">
@@ -65,29 +58,14 @@ export function Sidebar({ currentPage, onNavigate, onAdd }) {
         ))}
       </nav>
 
-      <div className="sidebar-studio-note" aria-hidden="true">
-        Create
-        <br />
-        Log
-        <br />
-        Organize
-        <br />
-        Repeat.
-        <SketchArrow />
-      </div>
-      <div className="sidebar-create">
-        <button type="button" className="sidebar-add" onClick={onAdd}>
-          <Plus size={36} strokeWidth={2} aria-hidden="true" />
-          <span>
-            Add
-            <br />
-            Artwork
-          </span>
-        </button>
-        <span className="sidebar-edition" aria-hidden="true">
-          A space for the work you make.
-        </span>
-      </div>
+      {!hideAdd && (
+        <div className="sidebar-create">
+          <button type="button" className="sidebar-add" onClick={onAdd}>
+            <Plus size={28} strokeWidth={2} aria-hidden="true" />
+            <span>Add Artwork</span>
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

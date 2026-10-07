@@ -4,7 +4,7 @@ import { CONTACT_EMAIL } from '../../utils/site'
 
 export default function PrivacyPage() {
   return (
-    <PublicPageLayout title="Privacy Policy">
+    <PublicPageLayout title="Privacy Policy" variant="legal">
       <p>
         This Privacy Policy explains how {APP_NAME} handles information when you use the website
         and web app at piecelogue.com, including the local-first app at /app.

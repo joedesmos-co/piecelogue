@@ -5,13 +5,14 @@ import { BottomNav, Sidebar } from './Navigation'
 import SiteFooter from './SiteFooter'
 import { BrushMark } from './StudioMarks'
 
-export default function AppShell({ currentPage, onNavigate, onAdd, children }) {
+export default function AppShell({ currentPage, onNavigate, onAdd, hideAdd = false, children }) {
   return (
     <div className="app-shell">
       <Sidebar
         currentPage={currentPage}
         onNavigate={onNavigate}
         onAdd={onAdd}
+        hideAdd={hideAdd}
       />
 
       <div className="app-main">
