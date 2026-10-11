@@ -144,7 +144,7 @@ export async function createThumbnail(blob, maxSize = THUMBNAIL_MAX_SIZE) {
     throw new Error('Failed to load image.')
   }
 
-  const normalized = await normalizeArtworkImage(source, { thumbnailMaxEdge: maxSize })
+  const normalized = await normalizeArtworkImage(source, { thumbnailMaxEdge: maxSize, thumbnailOnly: true })
   return normalized.thumbnail
 }
 

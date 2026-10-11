@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 import { repairArtworkImage } from '../db/artworkService'
-import { isAcceptedImportFile, normalizeArtworkImage } from '../utils/imageNormalize'
+import { isAcceptedImportFile } from '../utils/imageNormalize'
 import { formatUserError } from '../utils/userErrors'
 import { wakeSyncProcessor } from '../sync/processor'
 
@@ -31,8 +31,7 @@ export default function ImageRecoveryPanel({ entries = [], onRepaired, title }) 
     setError('')
 
     try {
-      const normalized = await normalizeArtworkImage(file)
-      await repairArtworkImage(artworkId, normalized.original)
+      await repairArtworkImage(artworkId, file)
       wakeSyncProcessor()
       onRepaired?.()
     } catch (err) {

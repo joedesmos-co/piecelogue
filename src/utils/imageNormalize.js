@@ -1,8 +1,8 @@
 /**
  * Canonical Piecelogue image normalization.
  *
- * Every imported image is decoded, drawn to a canvas, and exported as JPEG
- * before durable storage, hashing, thumbnails, sync, restore, or render.
+ * Local viewing copies and thumbnails use JPEG. Cloud display copies use
+ * WebP with a verified JPEG fallback. Downloaded cloud bytes bypass encoding.
  */
 
 export class ImageNormalizeError extends Error {
@@ -203,24 +203,24 @@ function createDrawingCanvas(width, height, deps = {}) {
   )
 }
 
-async function canvasToJpegBlob(canvas, quality, deps = {}) {
+async function canvasToImageBlob(canvas, quality, deps = {}, type = 'image/jpeg') {
   if (typeof deps.canvasToBlob === 'function') {
-    return deps.canvasToBlob(canvas, 'image/jpeg', quality)
+    return deps.canvasToBlob(canvas, type, quality)
   }
 
   if (typeof canvas.convertToBlob === 'function') {
-    return canvas.convertToBlob({ type: 'image/jpeg', quality })
+    return canvas.convertToBlob({ type, quality })
   }
 
   if (typeof canvas.toBlob === 'function') {
     const blob = await new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', quality)
+      canvas.toBlob(resolve, type, quality)
     })
     return blob
   }
 
   throw new ImageNormalizeError(
-    'This browser cannot export JPEG images.',
+    'This browser cannot export images.',
     'normalize_unavailable',
   )
 }
@@ -233,7 +233,7 @@ function getDrawableSize(source) {
   }
 }
 
-async function drawSourceToJpeg(source, options = {}, deps = {}) {
+async function drawSourceToImage(source, options = {}, deps = {}) {
   const { width: sourceWidth, height: sourceHeight } = getDrawableSize(source)
   if (!sourceWidth || !sourceHeight) {
     throw new ImageNormalizeError(
@@ -255,9 +255,20 @@ async function drawSourceToJpeg(source, options = {}, deps = {}) {
   // Opaque white backdrop so transparent PNG/WebP/GIF become solid JPEG.
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, sized.width, sized.height)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(source, 0, 0, sized.width, sized.height)
 
-  const blob = await canvasToJpegBlob(canvas, options.quality ?? ORIGINAL_JPEG_QUALITY, deps)
+  let blob
+  try {
+    blob = await canvasToImageBlob(canvas, options.quality ?? ORIGINAL_JPEG_QUALITY, deps, options.mimeType)
+  } catch (error) {
+    if (options.mimeType !== 'image/webp') throw error
+  }
+  // Unsupported canvas encoders silently return PNG in several browsers.
+  if (options.mimeType === 'image/webp' && blob?.type !== 'image/webp') {
+    blob = await canvasToImageBlob(canvas, options.quality, deps)
+  }
   if (!blob || blob.size === 0) {
     throw new ImageNormalizeError(
       'Could not convert this image to JPEG. Please try another file.',
@@ -428,7 +439,7 @@ export async function normalizeArtworkImage(fileOrBlob, options = {}, deps = {})
   }
 
   try {
-    const original = await drawSourceToJpeg(
+    const original = options.thumbnailOnly ? null : await drawSourceToImage(
       decoded.source,
       {
         maxEdge: options.maxOriginalEdge ?? MAX_ORIGINAL_EDGE,
@@ -437,7 +448,7 @@ export async function normalizeArtworkImage(fileOrBlob, options = {}, deps = {})
       deps,
     )
 
-    const thumbnail = await drawSourceToJpeg(
+    const thumbnail = await drawSourceToImage(
       decoded.source,
       {
         maxEdge: options.thumbnailMaxEdge ?? THUMBNAIL_MAX_EDGE,
@@ -447,13 +458,13 @@ export async function normalizeArtworkImage(fileOrBlob, options = {}, deps = {})
     )
 
     return {
-      original: original.blob,
+      original: original?.blob ?? null,
       thumbnail: thumbnail.blob,
-      width: original.width,
-      height: original.height,
+      width: original?.width ?? thumbnail.width,
+      height: original?.height ?? thumbnail.height,
       thumbnailWidth: thumbnail.width,
       thumbnailHeight: thumbnail.height,
-      scaled: original.scaled,
+      scaled: original?.scaled ?? thumbnail.scaled,
       sourceFormat: detected.format,
       sourceMimeType: detected.mimeType,
       mimeType: 'image/jpeg',
@@ -484,4 +495,40 @@ export function isHeicLikeFile(file) {
   }
   const ext = getFileExtension(file.name)
   return ext === '.heic' || ext === '.heif'
+}
+
+
+export const CLOUD_DISPLAY_VERSION = 1
+export const CLOUD_DISPLAY_MAX_EDGE = 2048
+export const CLOUD_DISPLAY_MIN_EDGE = 1600
+export const CLOUD_DISPLAY_QUALITY = 0.90
+export const CLOUD_DISPLAY_TARGET_BYTES = 1024 * 1024
+export const CLOUD_DISPLAY_MAX_BYTES = 2 * 1024 * 1024
+
+/** Encode from the source once; never feed a previous display copy into this. */
+export async function createCloudDisplayImage(blob, deps = {}) {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  if (!bytes.length) throw new ImageNormalizeError('Image file is empty.', 'empty_image')
+  const detected = detectSourceImageFormat(bytes, blob.type)
+  rejectNonImageMime(detected.mimeType, detected.format)
+  const sourceBlob = new Blob([bytes], { type: detected.mimeType })
+  const decoded = await decodeImageSource(bytes, sourceBlob.type, sourceBlob, deps)
+  if (!decoded) throw new ImageNormalizeError('Could not prepare cloud image.', 'normalize_failed')
+  try {
+    let display = await drawSourceToImage(decoded.source, {
+      maxEdge: CLOUD_DISPLAY_MAX_EDGE, quality: CLOUD_DISPLAY_QUALITY, mimeType: 'image/webp',
+    }, deps)
+    if (display.blob.size > CLOUD_DISPLAY_TARGET_BYTES) {
+      // Another candidate from the SAME decoded source, never from encoded bytes.
+      display = await drawSourceToImage(decoded.source, {
+        maxEdge: CLOUD_DISPLAY_MIN_EDGE, quality: CLOUD_DISPLAY_QUALITY, mimeType: 'image/webp',
+      }, deps)
+    }
+    if (!['image/webp', 'image/jpeg'].includes(display.blob.type) || display.blob.size > CLOUD_DISPLAY_MAX_BYTES) {
+      throw new ImageNormalizeError('Could not prepare a compact cloud image. Your local image is safe.', 'normalize_failed')
+    }
+    return { ...display, version: CLOUD_DISPLAY_VERSION }
+  } finally {
+    closeSource(decoded.source)
+  }
 }

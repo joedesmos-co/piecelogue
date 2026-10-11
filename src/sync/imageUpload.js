@@ -269,7 +269,7 @@ export async function prepareBlobForUpload(blob, details = {}) {
 
 export function describeImageUploadStage(stage) {
   if (stage === 'original') {
-    return 'Uploading original image…'
+    return 'Uploading display image…'
   }
   if (stage === 'thumbnail') {
     return 'Uploading thumbnail…'

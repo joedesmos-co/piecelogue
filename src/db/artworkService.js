@@ -1,3 +1,4 @@
+import { hashBytes } from '../sync/imageHash.js'
 import { db } from './database'
 import { generateId } from '../utils/id'
 import { calculateTotalMinutes } from '../utils/formatTime'
@@ -8,6 +9,7 @@ import {
   clearImageRecoveryRequired,
   deleteDurableImagesForArtwork,
   hasVerifiedDurableImage,
+  saveDurableImageBytes,
 } from './artworkImageStorage'
 import { enqueueArtworkImageSync } from '../sync/enqueue'
 import { resetFailedJobsForUser } from '../db/syncQueueService'
@@ -114,12 +116,18 @@ function normalizeArtworkRecord(artwork) {
   return normalized
 }
 
-async function persistArtworkImages(artworkId, imageBlob) {
-  const normalized = await normalizeArtworkImage(imageBlob)
-  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, normalized.original)
-  await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
-  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.ORIGINAL)
-  await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
+export async function persistArtworkImages(artworkId, imageBlob, deps = {}) {
+  const normalized = await normalizeArtworkImage(imageBlob, {}, deps)
+  const [source, original, thumbnail] = await Promise.all([
+    imageBlob.arrayBuffer(), normalized.original.arrayBuffer(), normalized.thumbnail.arrayBuffer(),
+  ])
+  const sourceHash = await hashBytes(original)
+  await db.transaction('rw', db.artworkImages, async () => {
+    await saveDurableImageBytes(artworkId, IMAGE_KINDS.SOURCE, source, normalized.sourceMimeType, { origin: 'local', sourceHash })
+    await saveDurableImageBytes(artworkId, IMAGE_KINDS.ORIGINAL, original, normalized.original.type, { origin: 'local' })
+    await saveDurableImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, thumbnail, normalized.thumbnail.type, { origin: 'local' })
+    await db.artworkImages.delete(`${artworkId}:${IMAGE_KINDS.DISPLAY}`)
+  })
   return normalized
 }
 
@@ -134,7 +142,7 @@ export async function ensureThumbnailFromOriginal(artworkId) {
   }
 
   const originalBlob = bytesToBlob(original.bytes, original.mimeType || 'image/jpeg')
-  const normalized = await normalizeArtworkImage(originalBlob)
+  const normalized = await normalizeArtworkImage(originalBlob, { thumbnailOnly: true })
   await writeIncomingImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
   await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
   return { created: true }

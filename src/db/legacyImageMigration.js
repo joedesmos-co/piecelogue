@@ -10,9 +10,7 @@ import {
   logImageReadDiagnostic,
   readBytesFromBlobValue,
   readStoredImageBytes,
-  bytesToBlob,
 } from './readStoredImageBytes.js'
-import { normalizeArtworkImage } from '../utils/imageNormalize.js'
 
 export const LEGACY_IMAGE_MIGRATION_BATCH_SIZE = 5
 const MIGRATION_CURSOR_KEY = 'legacyImageMigrationCursor'
@@ -72,29 +70,8 @@ export async function migrateLegacyArtworkImage(artwork, kind, deps = {}) {
     return { status: 'recovery_required', artworkId, kind, error: readResult.error }
   }
 
-  const normalize = deps.normalizeArtworkImage ?? normalizeArtworkImage
-  let durableBytes = readResult.bytes
-  let durableMime = readResult.mimeType || 'image/jpeg'
-
-  try {
-    const normalized = await normalize(
-      bytesToBlob(readResult.bytes, readResult.mimeType || 'application/octet-stream'),
-      {},
-      deps,
-    )
-    if (kind === IMAGE_KINDS.ORIGINAL) {
-      durableBytes = new Uint8Array(await normalized.original.arrayBuffer())
-      durableMime = 'image/jpeg'
-      await saveDurable(artworkId, IMAGE_KINDS.THUMBNAIL, new Uint8Array(await normalized.thumbnail.arrayBuffer()), 'image/jpeg', {
-        migratedFromLegacy: true,
-      })
-    } else {
-      durableBytes = new Uint8Array(await normalized.thumbnail.arrayBuffer())
-      durableMime = 'image/jpeg'
-    }
-  } catch {
-    // If normalization is unavailable in this environment, keep verified legacy bytes.
-  }
+  const durableBytes = readResult.bytes
+  const durableMime = readResult.mimeType || 'image/jpeg'
 
   await saveDurable(artworkId, kind, durableBytes, durableMime, {
     migratedFromLegacy: true,

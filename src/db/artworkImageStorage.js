@@ -75,6 +75,9 @@ export async function saveDurableImageBytes(artworkId, kind, bytes, mimeType, op
     recoveryRequired: false,
     recoveryReason: null,
     migratedFromLegacy: Boolean(options.migratedFromLegacy),
+    origin: options.origin ?? null,
+    sourceHash: options.sourceHash ?? null,
+    policyVersion: options.policyVersion ?? null,
     updatedAt: new Date().toISOString(),
   }
 

@@ -57,12 +57,13 @@ export default function ArtworkForm({
   const [artworkDate, setArtworkDate] = useState(artwork?.artworkDate || '')
   const [notes, setNotes] = useState(artwork?.notes || '')
   const [imageFile, setImageFile] = useState(null)
+  const [previewImage, setPreviewImage] = useState(null)
   const [error, setError] = useState('')
 
   const newImagePreview = useMemo(() => {
-    if (!imageFile) return null
-    return URL.createObjectURL(imageFile)
-  }, [imageFile])
+    if (!previewImage) return null
+    return URL.createObjectURL(previewImage)
+  }, [previewImage])
 
   const folderOptions = useMemo(() => getFolderPickerOptions(folders), [folders])
 
@@ -86,9 +87,11 @@ export default function ArtworkForm({
     setError('')
     try {
       const normalized = await normalizeArtworkImage(file)
-      setImageFile(normalized.original)
+      setImageFile(file)
+      setPreviewImage(normalized.original)
     } catch (err) {
       setImageFile(null)
+      setPreviewImage(null)
       setError(
         formatUserError(
           err,

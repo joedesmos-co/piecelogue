@@ -468,7 +468,12 @@ export async function saveArtworkOriginal(
   contentType,
   hooks = {},
 ) {
-  const objectKey = getOriginalObjectKey(userId, artworkId, contentType)
+  // Keep the existing key even if the MIME changes. GET uses R2 Content-Type,
+  // not the extension, and replacement does not leave a large orphan behind.
+  const existing = await db.prepare(
+    'SELECT original_object_key FROM artworks WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+  ).bind(artworkId, userId).first()
+  const objectKey = existing?.original_object_key || getOriginalObjectKey(userId, artworkId, contentType)
 
   hooks.onStorageStart?.()
   await bucket.put(objectKey, body, {

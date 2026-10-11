@@ -12,7 +12,7 @@ import {
 import { formatTime, UNKNOWN_DURATION_LABEL, isDurationUnknown } from '../utils/formatTime'
 import { resolveMediumType } from '../utils/constants'
 import { getFolderPathLabel } from '../utils/folderTree'
-import { isAcceptedImportFile, normalizeArtworkImage } from '../utils/imageNormalize'
+import { isAcceptedImportFile } from '../utils/imageNormalize'
 import { useArtworkImageSource } from '../hooks/useArtworkImageSource'
 import { repairArtworkImage } from '../db/artworkService'
 import { formatUserError } from '../utils/userErrors'
@@ -67,8 +67,7 @@ export default function ArtworkDetail({
     setRepairError('')
 
     try {
-      const normalized = await normalizeArtworkImage(file)
-      await repairArtworkImage(artwork.id, normalized.original)
+      await repairArtworkImage(artwork.id, file)
       setRepairInputKey((value) => value + 1)
       onImageRepaired?.()
     } catch (error) {

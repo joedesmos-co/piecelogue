@@ -240,7 +240,7 @@ export default function CloudSaveSection({ authenticated }) {
             <p className="settings-text">
               Cloud library: {cloudStatus.folderCount} folders, {cloudStatus.artworkCount} artworks
               {typeof cloudStatus.artworkWithOriginalCount === 'number'
-                ? ` (${cloudStatus.artworkWithOriginalCount} with originals, ${cloudStatus.artworkWithThumbnailCount ?? 0} with thumbnails)`
+                ? ` (${cloudStatus.artworkWithOriginalCount} with display images, ${cloudStatus.artworkWithThumbnailCount ?? 0} with thumbnails)`
                 : ''}
             </p>
           </div>
@@ -248,7 +248,8 @@ export default function CloudSaveSection({ authenticated }) {
 
         <div className="cloud-sync-restore">
           <p className="settings-text settings-text--muted">
-            Download your cloud library to this device. If this device already has artwork, you will
+            Cloud sync stores high-quality viewing copies. Original imported files stay on this device;
+            export a local backup to keep them elsewhere. Download your cloud library to this device. If this device already has artwork, you will
             be asked before anything is replaced.
           </p>
 

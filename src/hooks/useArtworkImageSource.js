@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { readArtworkImageBytes, bytesToBlob } from '../db/artworkImageReader.js'
-import { IMAGE_KINDS } from '../db/artworkImageKeys.js'
+import { IMAGE_KINDS, getArtworkImageKinds } from '../db/artworkImageKeys.js'
 import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration.js'
 
 export function useArtworkImageSource(artwork, mode = 'gallery') {
@@ -15,10 +15,7 @@ export function useArtworkImageSource(artwork, mode = 'gallery') {
     }
 
     let cancelled = false
-    const kinds =
-      mode === 'gallery'
-        ? [IMAGE_KINDS.THUMBNAIL, IMAGE_KINDS.ORIGINAL]
-        : [IMAGE_KINDS.ORIGINAL, IMAGE_KINDS.THUMBNAIL]
+    const kinds = getArtworkImageKinds(mode)
 
     async function load() {
       setLoading(true)

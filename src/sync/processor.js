@@ -37,10 +37,10 @@ import {
 } from './constants'
 import { hashBytes, shouldUploadImage } from './imageHash'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
-import { readArtworkImageBytes } from '../db/artworkImageReader'
 import { markImageRecoveryRequired, hasStoredImageBytes } from '../db/artworkImageStorage'
 import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration'
-import { getArtworksNeedingImageRecovery, resolveArtworkImageForSync } from '../db/imageRepair'
+import { getArtworksNeedingImageRecovery } from '../db/imageRepair'
+import { resolveCloudImageForSync } from '../db/cloudDisplayService'
 import { createUploadRequestId } from './uploadDiagnostics'
 import { filterJobsForActiveUser, isJobReady, sortSyncJobs } from './queueLogic'
 import { buildRetryUpdate } from './retry'
@@ -291,7 +291,7 @@ async function processArtworkImageJob(job) {
     const cloudMissing =
       (kind === IMAGE_KINDS.ORIGINAL && incompleteCloud?.missingOriginal) ||
       (kind === IMAGE_KINDS.THUMBNAIL && incompleteCloud?.missingThumbnail)
-    const result = await resolveArtworkImageForSync(artwork, kind)
+    const result = await resolveCloudImageForSync(artwork, kind)
 
     if (!result.ok) {
       // Never treat a prior local hash as proof the cloud has the image.
@@ -793,35 +793,14 @@ export async function recoverSyncJobs(userId) {
   return recovered
 }
 
-export async function recordForceSyncComplete(userId, artworks) {
-  if (!userId) {
-    return
-  }
-
+export async function recordForceSyncComplete(userId, uploadedHashes) {
+  if (!userId) return
   await markLibrarySeeded(userId)
   await setLastSyncedAt(userId)
-
-  for (const artwork of artworks) {
-    let originalHash = null
-    let thumbnailHash = null
-
-    const original = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, {
-      legacyBlob: artwork.image,
-    })
-    if (original.ok) {
-      originalHash = await hashBytes(original.bytes)
-    }
-
-    const thumbnail = await readArtworkImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, {
-      legacyBlob: artwork.thumbnail,
-    })
-    if (thumbnail.ok) {
-      thumbnailHash = await hashBytes(thumbnail.bytes)
-    }
-
-    if (originalHash || thumbnailHash) {
-      await setImageHashes(userId, artwork.id, { originalHash, thumbnailHash })
-    }
+  // Hashes must describe successful requests, never a newer local image that
+  // might have changed while the user was waiting for force-save to finish.
+  for (const [artworkId, hashes] of uploadedHashes) {
+    await setImageHashes(userId, artworkId, hashes)
   }
 }
 

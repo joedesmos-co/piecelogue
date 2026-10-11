@@ -2,13 +2,11 @@ import { downloadCloudArtworkImage, fetchCloudLibrary } from '../api/cloud.js'
 import { db } from './database.js'
 import { IMAGE_KINDS } from './artworkImageKeys.js'
 import {
-  clearImageRecoveryRequired,
   getArtworksNeedingImageRecovery,
   getDurableImageRecord,
 } from './artworkImageStorage.js'
-import { writeIncomingImageBytes } from './legacyImageMigration.js'
+import { saveRestoredArtworkImage } from './restoreService.js'
 import { readStoredImageBytes } from './readStoredImageBytes.js'
-import { normalizeArtworkImage } from '../utils/imageNormalize.js'
 
 function cloudArtworkHasImage(cloudArtwork, kind) {
   if (kind === IMAGE_KINDS.THUMBNAIL) {
@@ -28,25 +26,8 @@ export async function tryRepairArtworkImageFromCloud(artworkId, kind, options = 
   }
 
   const blob = await downloadImage(artworkId, kind)
-  const normalized = await normalizeArtworkImage(blob, {}, options.deps)
-  const targetBlob =
-    kind === IMAGE_KINDS.THUMBNAIL ? normalized.thumbnail : normalized.original
-  const read = await writeIncomingImageBytes(artworkId, kind, targetBlob, options.deps)
-  if (kind === IMAGE_KINDS.ORIGINAL) {
-    await writeIncomingImageBytes(
-      artworkId,
-      IMAGE_KINDS.THUMBNAIL,
-      normalized.thumbnail,
-      options.deps,
-    )
-    await clearImageRecoveryRequired(artworkId, IMAGE_KINDS.THUMBNAIL)
-  }
-  await clearImageRecoveryRequired(artworkId, kind)
-  return {
-    repaired: true,
-    byteLength: read.byteLength,
-    mimeType: read.mimeType,
-  }
+  await saveRestoredArtworkImage(artworkId, kind, blob)
+  return { repaired: true, byteLength: blob.size, mimeType: blob.type }
 }
 
 export async function repairArtworkImagesFromCloud(artworkId, options = {}) {

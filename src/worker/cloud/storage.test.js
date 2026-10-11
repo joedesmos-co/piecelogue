@@ -38,6 +38,7 @@ describe('cloud image storage completion', () => {
         return {
           bind() {
             return {
+              async first() { return null },
               async run() {
                 databaseUpdated = true
               },
@@ -59,7 +60,7 @@ describe('cloud image storage completion', () => {
       completed = true
     })
 
-    await Promise.resolve()
+    await new Promise((resolve) => setImmediate(resolve))
     assert.equal(completed, false)
     assert.equal(databaseUpdated, false)
 
@@ -208,5 +209,35 @@ describe('cloud delete helpers', () => {
 
     assert.equal(activeFolder.id, 'folder-1')
     assert.equal('deleted_at' in activeFolder, false)
+  })
+})
+
+describe('optimized display replaces old R2 originals without orphaning them', () => {
+  it('reuses the legacy JPEG key with WebP Content-Type and compatible metadata', async () => {
+    const key = 'users/user-1/artworks/art-1/original.jpg'
+    const objects = new Map([[key, { body: new Uint8Array(2_000_000), httpMetadata: { contentType: 'image/jpeg' } }]])
+    let savedKey
+    const db = { prepare() { return { bind(...args) { return {
+      async first() { return { original_object_key: key } },
+      async run() { savedKey = args[0] },
+    } } } } }
+    const body = new Uint8Array(300_000)
+    const bucket = { async put(key, bytes, options) { objects.set(key, { body: bytes, ...options }) } }
+    await saveArtworkOriginal(db, bucket, 'user-1', 'art-1', body, 'image/webp')
+    assert.equal(objects.size, 1)
+    assert.equal(savedKey, key)
+    assert.equal(objects.get(key).body.byteLength, 300_000)
+    assert.equal(objects.get(key).httpMetadata.contentType, 'image/webp')
+    assert.equal(mapCloudArtworkRow({ id: 'art-1', original_object_key: savedKey }).hasOriginal, true)
+  })
+  it('failed R2 write leaves the previous object and metadata intact', async () => {
+    let updated = false
+    const db = { prepare() { return { bind() { return {
+      async first() { return { original_object_key: 'old.jpg' } },
+      async run() { updated = true },
+    } } } } }
+    const bucket = { async put() { throw Error('storage unavailable') } }
+    await assert.rejects(saveArtworkOriginal(db, bucket, 'user', 'art', new Uint8Array([1]), 'image/webp'))
+    assert.equal(updated, false)
   })
 })

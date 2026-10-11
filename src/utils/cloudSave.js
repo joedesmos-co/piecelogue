@@ -4,7 +4,7 @@ import { clearSyncQueueForUser } from '../db/syncQueueService'
 import { setArtworkCloudRevision, setFolderCloudRevision } from '../db/syncRevisionService'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
 import { ensureArtworkImagesMigrated } from '../db/legacyImageMigration'
-import { resolveArtworkImageForSync } from '../db/imageRepair'
+import { resolveCloudImageForSync } from '../db/cloudDisplayService'
 import { markImageRecoveryRequired } from '../db/artworkImageStorage'
 import { ImageReadError } from '../db/imageReadError'
 import {
@@ -13,6 +13,7 @@ import {
   uploadCloudArtworks,
   uploadCloudFolders,
 } from '../api/cloud'
+import { hashBytes } from '../sync/imageHash'
 import { toCloudArtworkMetadata, toCloudFolder } from '../sync/cloudPayload'
 import { describeImageUploadStage, prepareBytesForUpload } from '../sync/imageUpload'
 import {
@@ -40,12 +41,12 @@ async function buildImageUploadSteps(artworks) {
   for (const artwork of artworks) {
     await ensureArtworkImagesMigrated(artwork.id)
     await ensureThumbnailFromOriginal(artwork.id)
-    const original = await resolveArtworkImageForSync(artwork, IMAGE_KINDS.ORIGINAL)
+    const original = await resolveCloudImageForSync(artwork, IMAGE_KINDS.ORIGINAL)
     if (original.ok) {
       steps.push({ artwork, type: 'original', bytes: original.bytes, mimeType: original.mimeType })
     }
 
-    const thumbnail = await resolveArtworkImageForSync(artwork, IMAGE_KINDS.THUMBNAIL)
+    const thumbnail = await resolveCloudImageForSync(artwork, IMAGE_KINDS.THUMBNAIL)
     if (thumbnail.ok) {
       steps.push({
         artwork,
@@ -75,6 +76,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
     const folders = await folderService.getAllFolders()
     const artworks = await artworkService.getAllArtworks()
     const imageSteps = await buildImageUploadSteps(artworks)
+    const uploadedHashes = new Map()
 
     onProgress?.({
       phase: 'folders',
@@ -179,6 +181,9 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
             ...prepared,
           })
         }
+        const hashes = uploadedHashes.get(artwork.id) || {}
+        hashes[type === 'original' ? 'originalHash' : 'thumbnailHash'] = await hashBytes(prepared.body)
+        uploadedHashes.set(artwork.id, hashes)
       } catch (error) {
         if (error instanceof ImageReadError) {
           await markImageRecoveryRequired(artwork.id, type, error.code)
@@ -191,7 +196,7 @@ export async function saveLibraryToCloud({ onProgress, userId } = {}) {
 
     if (userId) {
       await clearSyncQueueForUser(userId)
-      await recordForceSyncComplete(userId, artworks)
+      await recordForceSyncComplete(userId, uploadedHashes)
       try {
         await reconcileIncompleteCloudImages(userId, { force: true })
       } catch {

@@ -4,8 +4,7 @@ import * as folderService from '../db/folderService.js'
 import { APP_NAME, APP_VERSION } from './constants.js'
 import { IMAGE_KINDS } from '../db/artworkImageKeys'
 import { readArtworkImageBytes, bytesToBlob } from '../db/artworkImageReader'
-import { writeIncomingImageBytes } from '../db/legacyImageMigration'
-import { normalizeArtworkImage } from './imageNormalize.js'
+import { getDurableImageRecord, saveDurableImageBytes } from '../db/artworkImageStorage'
 import {
   getBackupVersion,
   MAX_BACKUP_BYTES,
@@ -70,6 +69,7 @@ export async function buildLocalBackup() {
     if (original.ok) {
       record.image = {
         type: original.mimeType || 'image/jpeg',
+        origin: (await getDurableImageRecord(artwork.id, IMAGE_KINDS.ORIGINAL))?.origin ?? null,
         data: await blobToBase64(bytesToBlob(original.bytes, original.mimeType)),
       }
     }
@@ -84,6 +84,16 @@ export async function buildLocalBackup() {
       }
     }
 
+    // Optional v1 fields preserve untouched sources and exact display bytes.
+    for (const [field, kind] of [['sourceImage', IMAGE_KINDS.SOURCE], ['cloudDisplayImage', IMAGE_KINDS.DISPLAY]]) {
+      const image = await getDurableImageRecord(artwork.id, kind)
+      if (image?.data && image.byteLength === image.data.byteLength) {
+        record[field] = {
+          type: image.mimeType, data: await blobToBase64(new Blob([image.data], { type: image.mimeType })),
+          origin: image.origin, sourceHash: image.sourceHash, policyVersion: image.policyVersion,
+        }
+      }
+    }
     serializedArtworks.push(record)
   }
 
@@ -127,13 +137,13 @@ export async function downloadLocalBackup() {
   }
 }
 
-function base64ToBlob(base64, type) {
+function base64ToBytes(base64) {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index)
   }
-  return new Blob([bytes], { type: type || 'image/jpeg' })
+  return bytes
 }
 
 export { parseLocalBackupText, validateLocalBackup }
@@ -182,14 +192,21 @@ export async function importLocalBackup(backup) {
       }
 
       if (artwork.image?.data) {
-        const imageBlob = base64ToBlob(artwork.image.data, artwork.image.type)
-        const normalized = await normalizeArtworkImage(imageBlob)
-        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.ORIGINAL, normalized.original)
-        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
-      } else if (artwork.thumbnail?.data) {
-        const thumbnailBlob = base64ToBlob(artwork.thumbnail.data, artwork.thumbnail.type)
-        const normalized = await normalizeArtworkImage(thumbnailBlob)
-        await writeIncomingImageBytes(artwork.id, IMAGE_KINDS.THUMBNAIL, normalized.thumbnail)
+        // Invalidate derivatives from any previously stored image with this id.
+        // An older/cloud-only backup must not discard this device's source file.
+        await db.artworkImages.delete(`${artwork.id}:${IMAGE_KINDS.DISPLAY}`)
+        await db.artworkImages.delete(`${artwork.id}:${IMAGE_KINDS.THUMBNAIL}`)
+      }
+      for (const [field, kind] of [
+        ['image', IMAGE_KINDS.ORIGINAL], ['thumbnail', IMAGE_KINDS.THUMBNAIL],
+        ['sourceImage', IMAGE_KINDS.SOURCE], ['cloudDisplayImage', IMAGE_KINDS.DISPLAY],
+      ]) {
+        const image = artwork[field]
+        if (image?.data) {
+          await saveDurableImageBytes(artwork.id, kind, base64ToBytes(image.data), image.type || 'image/jpeg', {
+            origin: image.origin, sourceHash: image.sourceHash, policyVersion: image.policyVersion,
+          })
+        }
       }
 
       await db.artworks.put(record)
