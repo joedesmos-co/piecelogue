@@ -3,11 +3,13 @@ import * as artworkService from '../db/artworkService.js'
 import { IMAGE_KINDS } from '../db/artworkImageKeys.js'
 import {
   clearImageRecoveryRequired,
+  deleteOrphanRecoveryImageRecords,
   hasStoredImageBytes,
   markImageRecoveryRequired,
 } from '../db/artworkImageStorage.js'
 import { clearImageHashes } from '../db/syncImageHashService.js'
 import { enqueueSyncJob, getSyncJobsForUser } from '../db/syncQueueService.js'
+import { filterRepairableEntries } from '../utils/repairEntries.js'
 import { SYNC_ENTITY_TYPES } from './constants.js'
 import {
   findIncompleteCloudArtworks,
@@ -40,6 +42,10 @@ async function enqueueMissingImageUpload(userId, artworkId) {
 /**
  * Compare cloud library image flags with local durable bytes.
  * Re-queues uploads when local bytes exist; marks recovery when they do not.
+ *
+ * Tombstones and artwork with no local row are excluded: the user cannot
+ * re-select an image for artwork that no longer exists, so they must never
+ * become image-repair work.
  */
 export async function reconcileIncompleteCloudImages(userId, options = {}) {
   if (!userId) {
@@ -54,7 +60,20 @@ export async function reconcileIncompleteCloudImages(userId, options = {}) {
 
   const fetchLibrary = options.fetchLibrary ?? fetchCloudLibrary
   const library = await fetchLibrary()
-  const incomplete = findIncompleteCloudArtworks(library.artworks || [])
+
+  // The pull path fetches tombstones on purpose; drop them before comparing
+  // images so a deleted cloud row never manufactures repair work.
+  const liveCloudArtworks = (library.artworks || []).filter((artwork) => !artwork.deletedAt)
+  const cloudIncomplete = findIncompleteCloudArtworks(liveCloudArtworks)
+
+  // Only artwork that still exists locally is repairable.
+  const localArtworks = await artworkService.getAllArtworks()
+  const localById = new Map(localArtworks.map((artwork) => [artwork.id, artwork]))
+  const incomplete = filterRepairableEntries(
+    cloudIncomplete,
+    new Set(localById.keys()),
+  )
+
   setCachedIncompleteCloudImages(incomplete)
   lastReconcileAt = now
 
@@ -81,13 +100,15 @@ export async function reconcileIncompleteCloudImages(userId, options = {}) {
     }
   }
 
-  // Refresh titles from local metadata when available.
-  const localArtworks = await artworkService.getAllArtworks()
-  const titleById = new Map(localArtworks.map((artwork) => [artwork.id, artwork.title]))
+  // Durable rows left behind for artwork that no longer exists locally cannot
+  // be repaired. Remove them so a stale pass cannot resurrect warnings.
+  await deleteOrphanRecoveryImageRecords()
+
+  // Titles come from the live local row, never from a deleted cloud record.
   setCachedIncompleteCloudImages(
     incomplete.map((entry) => ({
       ...entry,
-      title: titleById.get(entry.artworkId) || entry.title,
+      title: localById.get(entry.artworkId)?.title || entry.title,
     })),
   )
 
@@ -107,7 +128,12 @@ export async function hasPendingArtworkImageJobs(userId) {
 }
 
 export async function getIncompleteCloudStatusPayload(userId) {
-  const incomplete = getCachedIncompleteCloudImages()
+  const localArtworks = await artworkService.getAllArtworks()
+  const liveIds = new Set(localArtworks.map((artwork) => artwork.id))
+  const incomplete = filterRepairableEntries(
+    getCachedIncompleteCloudImages(),
+    liveIds,
+  )
   const hasPendingImageJobs = await hasPendingArtworkImageJobs(userId)
   if (!shouldReportIncompleteCloudImages(incomplete, { hasPendingImageJobs })) {
     return null

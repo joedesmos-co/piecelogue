@@ -502,15 +502,20 @@ async function buildStatus(userId) {
   const forceSyncActive = isForceSyncActive()
   const activeUpload = activeUploadDetail
   const recoveryRequired = await getArtworksNeedingImageRecovery()
-  const recoveryRequiredWithTitles = await Promise.all(
-    recoveryRequired.map(async (entry) => {
-      const artwork = await db.artworks.get(entry.artworkId)
+  const localTitles = new Map(
+    (await artworkService.getAllArtworks()).map((artwork) => [artwork.id, artwork.title]),
+  )
+  const recoveryRequiredWithTitles = recoveryRequired
+    .filter((entry) => localTitles.has(entry.artworkId))
+    .map((entry) => {
+      const title = localTitles.get(entry.artworkId)
       return {
         ...entry,
-        title: artwork?.title || 'Untitled artwork',
+        // "Untitled artwork" is reserved for a real artwork that genuinely has
+        // no title. An entry here always has a live local row, so use its title.
+        title: title?.trim() ? title : 'Untitled artwork',
       }
-    }),
-  )
+    })
 
   if (recoveryRequiredWithTitles.length > 0) {
     return {

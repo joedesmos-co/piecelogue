@@ -42,6 +42,13 @@ function artworkWithoutImages(id) {
   }
 }
 
+// The reconcile path now requires a live local row: an artwork the user can no
+// longer see cannot be repaired. Real artwork always has one, so the fixtures
+// register it explicitly rather than testing a state the app cannot reach.
+async function seedLocalArtwork(id) {
+  await db.artworks.put({ ...artworkWithoutImages(id), hours: 0, minutes: 0, totalMinutes: 0, durationUnknown: false, medium: '', notes: '', favorite: false, folderId: null })
+}
+
 describe('resolveArtworkImageForSync durable read', () => {
   before(async () => {
     await db.open()
@@ -234,6 +241,7 @@ describe('reconcileIncompleteCloudImages requeues without clearing', () => {
   // E. Durable bytes present but cloud keys missing => requeue the upload and
   // leave the local image untouched.
   it('E. requeues an upload when cloud keys are missing but local bytes exist', async () => {
+    await seedLocalArtwork('e-1')
     await saveDurableImageBytes('e-1', IMAGE_KINDS.ORIGINAL, ORIGINAL_BYTES, 'image/jpeg')
     await saveDurableImageBytes('e-1', IMAGE_KINDS.THUMBNAIL, THUMBNAIL_BYTES, 'image/jpeg')
 
@@ -254,6 +262,7 @@ describe('reconcileIncompleteCloudImages requeues without clearing', () => {
   })
 
   it('E2. requeues and un-flags an image that was flagged but still intact', async () => {
+    await seedLocalArtwork('e-2')
     await saveDurableImageBytes('e-2', IMAGE_KINDS.ORIGINAL, ORIGINAL_BYTES, 'image/jpeg')
     await saveDurableImageBytes('e-2', IMAGE_KINDS.THUMBNAIL, THUMBNAIL_BYTES, 'image/jpeg')
     await markImageRecoveryRequired('e-2', IMAGE_KINDS.ORIGINAL, 'missing_image')
@@ -272,6 +281,7 @@ describe('reconcileIncompleteCloudImages requeues without clearing', () => {
   })
 
   it('E3. flags recovery only when no local bytes exist', async () => {
+    await seedLocalArtwork('e-3')
     await reconcileIncompleteCloudImages('user-e3', {
       force: true,
       fetchLibrary: async () => ({

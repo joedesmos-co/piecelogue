@@ -2,6 +2,19 @@
  * Pure helpers for detecting D1 artwork metadata that is missing R2 images.
  */
 
+/**
+ * True when the cloud row is a live artwork, not a delete tombstone.
+ *
+ * The pull path deliberately fetches tombstones so it can propagate deletes.
+ * Cloud-image reconciliation reuses that same library snapshot, so it must
+ * reject tombstones itself: a deleted artwork will never get its R2 objects
+ * back, and treating it as "missing images" manufactures repair work for
+ * records that no longer exist locally.
+ */
+export function isActiveCloudArtwork(cloudArtwork) {
+  return Boolean(cloudArtwork) && !cloudArtwork.deletedAt
+}
+
 export function isCloudArtworkImageIncomplete(cloudArtwork) {
   if (!cloudArtwork) {
     return false
@@ -11,6 +24,7 @@ export function isCloudArtworkImageIncomplete(cloudArtwork) {
 
 export function findIncompleteCloudArtworks(cloudArtworks = []) {
   return cloudArtworks
+    .filter((artwork) => isActiveCloudArtwork(artwork))
     .filter((artwork) => isCloudArtworkImageIncomplete(artwork))
     .map((artwork) => ({
       artworkId: artwork.id,

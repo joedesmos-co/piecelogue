@@ -1,6 +1,6 @@
 import { downloadCloudArtworkImage, fetchCloudLibrary } from '../api/cloud.js'
-import { db } from './database.js'
 import { IMAGE_KINDS } from './artworkImageKeys.js'
+import * as artworkService from './artworkService.js'
 import {
   getArtworksNeedingImageRecovery,
   getDurableImageRecord,
@@ -98,19 +98,28 @@ export async function resolveArtworkImageForSync(artwork, kind, options = {}) {
   return result
 }
 
+/**
+ * Repair entries enriched with the live local title.
+ *
+ * Only artwork that still exists locally is included: an artwork deleted on
+ * this device has nothing left to re-select, so it must never appear in the
+ * repair UI.
+ */
 export async function getRecoveryRequiredArtworksWithTitles() {
   const recoveryEntries = await getArtworksNeedingImageRecovery()
-  const enriched = []
+  const localTitles = new Map(
+    (await artworkService.getAllArtworks()).map((artwork) => [artwork.id, artwork.title]),
+  )
 
-  for (const entry of recoveryEntries) {
-    const artwork = await db.artworks.get(entry.artworkId)
-    enriched.push({
-      ...entry,
-      title: artwork?.title || 'Untitled artwork',
+  return recoveryEntries
+    .filter((entry) => localTitles.has(entry.artworkId))
+    .map((entry) => {
+      const title = localTitles.get(entry.artworkId)
+      return {
+        ...entry,
+        title: title?.trim() ? title : 'Untitled artwork',
+      }
     })
-  }
-
-  return enriched
 }
 
 export { getArtworksNeedingImageRecovery }

@@ -499,16 +499,6 @@ body:has(.app-shell) {
   .mobile-header .brand-underline {
     height: 14px;
   }
-  .mobile-header-tagline {
-    font-family: var(--font-mono);
-    font-size: 9px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    line-height: 1.8;
-    margin: 0;
-    text-align: right;
-  }
   .bottom-nav {
     position: fixed;
     bottom: 0;
@@ -581,10 +571,6 @@ body:has(.app-shell) {
   }
   .mobile-header {
     padding: 26px 23px 5px;
-  }
-  .mobile-header-tagline {
-    font-size: 8px;
-    letter-spacing: 1.3px;
   }
 }
 

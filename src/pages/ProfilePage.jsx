@@ -84,11 +84,7 @@ export default function ProfilePage() {
 
   return (
     <div className="page profile-page">
-      <StudioHeading
-        kicker="Piecelogue"
-        title="My Studio"
-        note="A record of the work I make."
-      />
+      <StudioHeading kicker="Piecelogue" title="My Studio" />
 
       <AccountSection />
 

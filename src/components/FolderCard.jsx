@@ -83,10 +83,11 @@ export default function FolderCard({
         </div>
         <div className="folder-card-previews" aria-hidden="true">
           {folder.previews?.length > 0 ? (
-            folder.previews.map((previewBlobs, index) => (
-              <div key={index} className="folder-card-preview">
+            folder.previews.map((preview) => (
+              <div key={preview.id} className="folder-card-preview">
                 <ArtworkImage
-                  blobs={previewBlobs}
+                  artwork={preview}
+                  mode="gallery"
                   alt=""
                   className="folder-card-preview-image"
                   fallbackClassName="folder-card-preview-empty"

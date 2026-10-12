@@ -11,6 +11,7 @@ import { getCloudSyncStatusDetails } from '../sync/cloudSyncStatus'
 import { cancelForceSync } from '../sync/syncLock'
 import { CloudConflictPanel } from './CloudConflictSection'
 import ImageRecoveryPanel from './ImageRecoveryPanel'
+import { mergeRepairEntries } from '../utils/repairEntries'
 import { describeSyncJobStageLabel } from '../sync/statusDetails'
 
 function formatTimestamp(value) {
@@ -206,21 +207,17 @@ export default function CloudSaveSection({ authenticated }) {
 
         <CloudConflictPanel />
 
-        {status.state === 'recovery_required' || status.recoveryRequired?.length > 0 ? (
-          <ImageRecoveryPanel entries={status.recoveryRequired ?? []} onRepaired={retryNow} />
-        ) : null}
-
-        {status.state === 'image_upload_incomplete' || status.incompleteCloudImages?.length > 0 ? (
-          <ImageRecoveryPanel
-            title="Image upload incomplete. Re-select the image on the device that still has the file, then sync."
-            entries={(status.incompleteCloudImages ?? []).map((entry) => ({
+        <ImageRecoveryPanel
+          entries={mergeRepairEntries(
+            status.recoveryRequired ?? [],
+            (status.incompleteCloudImages ?? []).map((entry) => ({
               artworkId: entry.artworkId,
               title: entry.title,
               reasons: ['cloud_incomplete'],
-            }))}
-            onRepaired={retryNow}
-          />
-        ) : null}
+            })),
+          )}
+          onRepaired={retryNow}
+        />
 
         {statusLoading ? (
           <p className="settings-text settings-text--muted" role="status">

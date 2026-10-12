@@ -1,5 +1,6 @@
 import { db } from './database.js'
 import { buildArtworkImageId, IMAGE_KINDS } from './artworkImageKeys.js'
+import { notifyArtworkImagesChanged } from './imageChangeEvents.js'
 import { bytesToBlob } from './readStoredImageBytes.js'
 
 function normalizeBytes(bytes) {
@@ -90,6 +91,7 @@ export async function saveDurableImageBytes(artworkId, kind, bytes, mimeType, op
     throw new Error('Durable image verification failed after write.')
   }
 
+  notifyArtworkImagesChanged(artworkId)
   return record
 }
 
@@ -119,6 +121,8 @@ export async function markImageRecoveryRequired(artworkId, kind, reason = 'unrea
     migratedFromLegacy: existing?.migratedFromLegacy ?? false,
     updatedAt: new Date().toISOString(),
   })
+
+  notifyArtworkImagesChanged(artworkId)
 }
 
 export async function clearImageRecoveryRequired(artworkId, kind) {
@@ -132,19 +136,32 @@ export async function clearImageRecoveryRequired(artworkId, kind) {
     recoveryReason: null,
     updatedAt: new Date().toISOString(),
   })
+
+  notifyArtworkImagesChanged(artworkId)
 }
 
 export async function deleteDurableImagesForArtwork(artworkId) {
   await db.artworkImages.where('artworkId').equals(artworkId).delete()
+  notifyArtworkImagesChanged(artworkId)
 }
 
 export async function getArtworksNeedingImageRecovery() {
-  const records = await db.artworkImages
-    .filter((record) => record.recoveryRequired)
-    .toArray()
+  const [records, localArtworks] = await Promise.all([
+    db.artworkImages.filter((record) => record.recoveryRequired).toArray(),
+    db.artworks.toArray(),
+  ])
+
+  const localById = new Map(localArtworks.map((artwork) => [artwork.id, artwork]))
 
   const byArtwork = new Map()
   for (const record of records) {
+    // A flagged record with no local artwork row is an orphan: the artwork was
+    // deleted, or the flag came from a deleted/test record. There is nothing
+    // the user can re-select, so it must never appear as repair work.
+    if (!localById.has(record.artworkId)) {
+      continue
+    }
+
     const entry = byArtwork.get(record.artworkId) || {
       artworkId: record.artworkId,
       kinds: [],
@@ -158,6 +175,32 @@ export async function getArtworksNeedingImageRecovery() {
   }
 
   return Array.from(byArtwork.values())
+}
+
+/**
+ * Drop recovery-flagged durable-image rows that belong to no existing artwork.
+ *
+ * A reconcile pass that ran after an artwork was deleted (or against a stale
+ * sync job) can leave an orphan flagged behind. Such a record can never be
+ * repaired -- there is no artwork to re-select an image for -- and it surfaces
+ * as a permanent phantom "Untitled artwork" warning.
+ *
+ * Only rows flagged `recoveryRequired` are removed, so bytes written by a
+ * concurrent create (which always writes unflagged) are never caught.
+ */
+export async function deleteOrphanRecoveryImageRecords() {
+  const localArtworks = await db.artworks.toArray()
+  const localIds = new Set(localArtworks.map((artwork) => artwork.id))
+  const orphanIds = await db.artworkImages
+    .filter((record) => record.recoveryRequired && !localIds.has(record.artworkId))
+    .primaryKeys()
+
+  if (!orphanIds.length) {
+    return 0
+  }
+
+  await db.artworkImages.bulkDelete(orphanIds)
+  return orphanIds.length
 }
 
 export async function readDurableImageAsBlob(artworkId, kind) {

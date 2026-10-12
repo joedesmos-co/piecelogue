@@ -13,6 +13,7 @@ import {
 } from './artworkImageStorage'
 import { enqueueArtworkImageSync } from '../sync/enqueue'
 import { resetFailedJobsForUser } from '../db/syncQueueService'
+import { notifyArtworkImagesChanged } from './imageChangeEvents'
 import { getActiveSyncUserId } from '../sync/activeUser'
 import { writeIncomingImageBytes } from './legacyImageMigration'
 import { normalizeArtworkImage } from '../utils/imageNormalize'
@@ -128,6 +129,10 @@ export async function persistArtworkImages(artworkId, imageBlob, deps = {}) {
     await saveDurableImageBytes(artworkId, IMAGE_KINDS.THUMBNAIL, thumbnail, normalized.thumbnail.type, { origin: 'local' })
     await db.artworkImages.delete(`${artworkId}:${IMAGE_KINDS.DISPLAY}`)
   })
+
+  // Thumbnail/original bytes are what gallery cards and folder previews render,
+  // but the artwork metadata does not change. Notify so those views re-read.
+  notifyArtworkImagesChanged(artworkId)
   return normalized
 }
 

@@ -1,6 +1,7 @@
 import { db } from './database'
 import { IMAGE_KINDS } from './artworkImageKeys'
 import { getDurableImageRecord, saveDurableImageBytes } from './artworkImageStorage'
+import { notifyArtworkImagesChanged } from './imageChangeEvents'
 import { hashBytes } from '../sync/imageHash'
 
 export async function getLocalLibraryCounts() {
@@ -61,6 +62,10 @@ export async function saveRestoredArtworkImage(artworkId, imageType, blob) {
       await saveDurableImageBytes(artworkId, IMAGE_KINDS.DISPLAY, bytes, blob.type, { origin: 'cloud', sourceHash })
     }
   })
+
+  // The artwork row is untouched by a restore, so viewers must be told the
+  // durable bytes changed or previews would stay stuck on "image unavailable".
+  notifyArtworkImagesChanged(artworkId)
 }
 
 export async function saveRestoredArtworkImageBytes(artworkId, imageType, bytes, mimeType) {

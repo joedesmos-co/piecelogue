@@ -1,11 +1,11 @@
 import { db } from './database'
 import { generateId } from '../utils/id'
-import { coalesceArtworkBlobs, getGalleryImageBlobs } from '../utils/imageUtils'
 import {
   normalizeParentFolderId,
   wouldCreateFolderCycle,
 } from '../utils/folderTree'
 import { buildMetadataOnlyArtworkRecord } from './artworkPreservationCore'
+import { buildFolderPreviews } from './folderPreviewService.js'
 
 function normalizeFolderName(name) {
   return (name || '').trim()
@@ -26,12 +26,10 @@ export function isDuplicateFolderName(name, folders, parentFolderId, excludeId =
 }
 
 function enrichFolder(folder, artworks, folders) {
-  const folderArtworks = artworks
-    .filter((artwork) => artwork.folderId === folder.id)
-    .map(coalesceArtworkBlobs)
-  const previews = folderArtworks
-    .slice(0, 3)
-    .map((artwork) => getGalleryImageBlobs(artwork))
+  const folderArtworks = artworks.filter((artwork) => artwork.folderId === folder.id)
+  // Previews are artwork metadata only; bytes resolve through the durable
+  // artworkImages store at render time (same pipeline as ArtworkCard).
+  const previews = buildFolderPreviews(folderArtworks)
   const childCount = folders.filter(
     (item) => normalizeParentFolderId(item.parentFolderId) === folder.id,
   ).length

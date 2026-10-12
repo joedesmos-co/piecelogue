@@ -26,11 +26,6 @@ export default function AppShell({ currentPage, onNavigate, onAdd, hideAdd = fal
             <span className="brand-wordmark">{APP_NAME}</span>
             <BrushMark className="brand-underline" />
           </button>
-          <p className="mobile-header-tagline">
-            Your work.
-            <br />
-            Your story.
-          </p>
         </header>
 
         <main className="app-content">

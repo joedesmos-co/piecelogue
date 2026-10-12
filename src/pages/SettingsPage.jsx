@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { HardDrive, Sun, Download, Upload, Info, LoaderCircle } from 'lucide-react'
-import { APP_NAME, APP_TAGLINE, APP_VERSION } from '../utils/constants'
+import { APP_NAME, APP_VERSION } from '../utils/constants'
 import {
   downloadLocalBackup,
   importLocalBackup,
@@ -79,11 +79,7 @@ export default function SettingsPage() {
 
   return (
     <div className="page settings-page">
-      <StudioHeading
-        kicker="Piecelogue"
-        title="Studio Settings"
-        note="Quiet controls. Your work stays yours."
-      />
+      <StudioHeading kicker="Piecelogue" title="Studio Settings" />
 
       <section className="settings-section">
         <h3 className="settings-section-title">
@@ -205,7 +201,6 @@ export default function SettingsPage() {
       <section className="settings-section settings-about">
         <div className="settings-about-brand">
           <span className="settings-about-name">{APP_NAME}</span>
-          <span className="settings-about-tagline">{APP_TAGLINE}</span>
         </div>
         <p className="settings-version">Version {APP_VERSION} · Private beta</p>
         <p className="settings-text settings-text--muted">
