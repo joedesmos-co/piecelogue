@@ -30,6 +30,7 @@ export default function ArtworkForm({
   artwork,
   folders = [],
   defaultFolderId = null,
+  inspiration = null,
   onSave,
   onCancel,
   saving,
@@ -55,7 +56,9 @@ export default function ArtworkForm({
   })
   const [status, setStatus] = useState(artwork?.status || 'In Progress')
   const [artworkDate, setArtworkDate] = useState(artwork?.artworkDate || '')
-  const [notes, setNotes] = useState(artwork?.notes || '')
+  const [notes, setNotes] = useState(
+    artwork?.notes || (inspiration ? `Inspired by: "${inspiration}"` : ''),
+  )
   const [imageFile, setImageFile] = useState(null)
   const [previewImage, setPreviewImage] = useState(null)
   const [error, setError] = useState('')
@@ -162,6 +165,12 @@ export default function ArtworkForm({
 
   return (
     <form className="artwork-form" onSubmit={handleSubmit} noValidate>
+      {inspiration && (
+        <div className="inspiration-banner" role="note">
+          <span className="inspiration-label">INSPIRED BY</span>
+          <span className="inspiration-text">{inspiration}</span>
+        </div>
+      )}
       {error && (
         <div className="form-error" role="alert">
           {error}

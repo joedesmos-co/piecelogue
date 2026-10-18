@@ -8,6 +8,7 @@ import AppShell from './components/AppShell'
 import Modal from './components/Modal'
 import ArtworkForm from './components/ArtworkForm'
 import GalleryPage from './pages/GalleryPage'
+import ToolsPage from './pages/ToolsPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import { PAGES } from './utils/constants'
@@ -29,6 +30,7 @@ function AppContent() {
   const [showForm, setShowForm] = useState(false)
   const [editingArtwork, setEditingArtwork] = useState(null)
   const [defaultFolderId, setDefaultFolderId] = useState(null)
+  const [inspirationPrompt, setInspirationPrompt] = useState(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -41,9 +43,17 @@ function AppContent() {
     setShowForm(true)
   }
 
+  function handleStartPiece(prompt) {
+    setEditingArtwork(null)
+    setDefaultFolderId(null)
+    setInspirationPrompt(prompt || null)
+    setShowForm(true)
+  }
+
   function handleEdit(artwork) {
     setEditingArtwork(artwork)
     setDefaultFolderId(artwork.folderId || null)
+    setInspirationPrompt(null)
     setShowForm(true)
   }
 
@@ -51,6 +61,7 @@ function AppContent() {
     setShowForm(false)
     setEditingArtwork(null)
     setDefaultFolderId(null)
+    setInspirationPrompt(null)
   }
 
   async function handleSave(data, imageFile) {
@@ -73,6 +84,8 @@ function AppContent() {
         return <ProfilePage />
       case PAGES.SETTINGS:
         return <SettingsPage />
+      case PAGES.TOOLS:
+        return <ToolsPage onStartPiece={handleStartPiece} />
       case PAGES.GALLERY:
       default:
         return <GalleryPage onAdd={handleAdd} onEdit={handleEdit} />
@@ -94,14 +107,15 @@ function AppContent() {
         isOpen={showForm}
         onClose={saving ? () => {} : handleCloseForm}
         closeOnBackdrop={!saving}
-        title={editingArtwork ? 'Edit Artwork' : 'Add Artwork'}
+        title={editingArtwork ? 'Edit Artwork' : inspirationPrompt ? 'Add Artwork' : 'Add Artwork'}
         className="modal--form"
       >
         <ArtworkForm
-          key={editingArtwork?.id || `new-${defaultFolderId || 'none'}`}
+          key={editingArtwork?.id || `new-${defaultFolderId || 'none'}-${inspirationPrompt ? 'inspired' : 'plain'}`}
           artwork={editingArtwork}
           folders={folders}
           defaultFolderId={defaultFolderId}
+          inspiration={inspirationPrompt}
           onSave={handleSave}
           onCancel={handleCloseForm}
           saving={saving}

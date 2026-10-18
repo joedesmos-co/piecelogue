@@ -1,10 +1,11 @@
-import { Images, User, Settings, Plus } from 'lucide-react'
+import { Images, User, Settings, Plus, Wand2 } from 'lucide-react'
 import { APP_NAME, PAGES } from '../utils/constants'
 import { navigate } from '../utils/navigation'
 import { BrushMark } from './StudioMarks'
 
 const NAV_ITEMS = [
   { id: PAGES.GALLERY, label: 'Gallery', icon: Images },
+  { id: PAGES.TOOLS, label: 'Tools', icon: Wand2 },
   { id: PAGES.PROFILE, label: 'Profile', icon: User },
   { id: PAGES.SETTINGS, label: 'Settings', icon: Settings },
 ]
