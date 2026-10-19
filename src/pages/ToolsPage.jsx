@@ -24,7 +24,13 @@ import {
   buildWheelPrompt,
   generateQuickPrompt,
   QUICK_PROMPTS,
+  WHEEL_SUBJECTS,
+  WHEEL_MOODS,
+  WHEEL_SETTINGS,
+  WHEEL_CONSTRAINTS,
 } from '../utils/promptEngine'
+import { shouldReduceMotion } from '../utils/motionPreference'
+import { getWheelTargetRotation, getWheelSelectedIndex } from '../utils/promptWheel'
 
 // tolerant prop names for "start this piece"
 function resolveStartPiece(props) {
@@ -35,6 +41,13 @@ function resolveStartPiece(props) {
     props.onAddArtwork ||
     (() => {})
   )
+}
+
+const WHEEL_OPTIONS = {
+  SUBJECT: WHEEL_SUBJECTS,
+  MOOD: WHEEL_MOODS,
+  SETTING: WHEEL_SETTINGS,
+  CONSTRAINT: WHEEL_CONSTRAINTS,
 }
 
 const TOOL_CARDS = [
@@ -64,11 +77,6 @@ const TOOL_CARDS = [
   },
 ]
 
-function prefersReducedMotion() {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
 export default function ToolsPage(props) {
   const startPiece = resolveStartPiece(props)
   const [activeTool, setActiveTool] = useState(null)
@@ -87,16 +95,24 @@ export default function ToolsPage(props) {
 
   // WHEEL state
   const [wheelValues, setWheelValues] = useState(() => spinAll())
-  const [wheelSpinning, setWheelSpinning] = useState(false)
+  const [wheelCategory, setWheelCategory] = useState('SUBJECT')
   const [wheelRotation, setWheelRotation] = useState(0)
-  const wheelTimer = useRef(null)
+  const wheelRotationRef = useRef(0)
+  const [isWheelSpinning, setIsWheelSpinning] = useState(false)
+  const wheelTimersRef = useRef([])
+  const wheelResolveRef = useRef(null)
+  const skipWheelRef = useRef(false)
 
   // QUICK state
   const [quickResult, setQuickResult] = useState('')
 
   useEffect(() => {
     return () => {
-      if (wheelTimer.current) clearTimeout(wheelTimer.current)
+      wheelTimersRef.current.forEach((timer) => {
+        clearTimeout(timer)
+        clearInterval(timer)
+      })
+      wheelTimersRef.current = []
     }
   }, [])
 
@@ -126,36 +142,110 @@ export default function ToolsPage(props) {
     setChallengeResult(result)
   }, [challengeDifficulty])
 
-  const animateWheel = useCallback((cb) => {
-    if (prefersReducedMotion()) {
-      cb()
-      return
-    }
-    setWheelSpinning(true)
-    setWheelRotation((r) => r + 720)
-    if (wheelTimer.current) clearTimeout(wheelTimer.current)
-    wheelTimer.current = setTimeout(() => {
-      cb()
-      setWheelSpinning(false)
-    }, 420)
+  const reduceMotion = shouldReduceMotion()
+
+  const clearWheelTimers = useCallback(() => {
+    wheelTimersRef.current.forEach((timer) => {
+      clearTimeout(timer)
+      clearInterval(timer)
+    })
+    wheelTimersRef.current = []
   }, [])
 
-  const handleSpinAll = useCallback(() => {
-    animateWheel(() => {
-      setWheelValues(spinAll())
+  const spinWheelToValue = useCallback((category, value) => {
+    return new Promise((resolve) => {
+      const options = WHEEL_OPTIONS[category]
+      const index = getWheelSelectedIndex(options, value)
+      const turns = reduceMotion ? 0 : 3
+      const current = wheelRotationRef.current
+      const final = getWheelTargetRotation(current, options.length, index, turns)
+      wheelRotationRef.current = final
+      setWheelRotation(final)
+
+      if (reduceMotion) {
+        resolve()
+        return
+      }
+
+      wheelResolveRef.current = resolve
+      const duration = 460
+      const timer = setTimeout(() => {
+        wheelResolveRef.current = null
+        resolve()
+      }, duration)
+      wheelTimersRef.current.push(timer)
     })
-  }, [animateWheel])
+  }, [reduceMotion])
+
+  const handleSkipWheel = useCallback(() => {
+    skipWheelRef.current = true
+    clearWheelTimers()
+    if (wheelResolveRef.current) {
+      const resolve = wheelResolveRef.current
+      wheelResolveRef.current = null
+      resolve()
+    }
+  }, [clearWheelTimers])
+
+  const handleSpinAll = useCallback(async () => {
+    if (isWheelSpinning) return
+    setIsWheelSpinning(true)
+    skipWheelRef.current = false
+    clearWheelTimers()
+    const categories = WHEEL_CATEGORIES
+    const nextValues = { ...wheelValues }
+
+    for (let i = 0; i < categories.length; i += 1) {
+      if (skipWheelRef.current) {
+        for (let j = i; j < categories.length; j += 1) {
+          nextValues[categories[j]] = spinCategory(categories[j])
+        }
+        setWheelValues(nextValues)
+        setWheelCategory(categories[categories.length - 1])
+        break
+      }
+
+      const cat = categories[i]
+      setWheelCategory(cat)
+      const value = spinCategory(cat)
+      nextValues[cat] = value
+      await spinWheelToValue(cat, value)
+
+      if (skipWheelRef.current) {
+        for (let j = i + 1; j < categories.length; j += 1) {
+          nextValues[categories[j]] = spinCategory(categories[j])
+        }
+        setWheelValues(nextValues)
+        setWheelCategory(categories[categories.length - 1])
+        break
+      }
+
+      setWheelValues({ ...nextValues })
+    }
+
+    if (!skipWheelRef.current) {
+      setWheelValues(nextValues)
+    }
+
+    setIsWheelSpinning(false)
+    skipWheelRef.current = false
+    clearWheelTimers()
+  }, [isWheelSpinning, wheelValues, spinWheelToValue, clearWheelTimers])
 
   const handleSpinCategory = useCallback(
-    (category) => {
-      animateWheel(() => {
-        setWheelValues((prev) => ({
-          ...prev,
-          [category]: spinCategory(category),
-        }))
-      })
+    async (category) => {
+      if (isWheelSpinning) return
+      setIsWheelSpinning(true)
+      skipWheelRef.current = false
+      clearWheelTimers()
+      setWheelCategory(category)
+      const value = spinCategory(category)
+      await spinWheelToValue(category, value)
+      setWheelValues((prev) => ({ ...prev, [category]: value }))
+      setIsWheelSpinning(false)
+      clearWheelTimers()
     },
-    [animateWheel],
+    [isWheelSpinning, spinWheelToValue, clearWheelTimers],
   )
 
   const handleQuick = useCallback(() => {
@@ -348,52 +438,130 @@ export default function ToolsPage(props) {
 
       {activeTool === 'wheel' && (
         <PaperPanel className="tool-panel" tone="bone">
-          <div className="prompt-wheel-wrap" aria-hidden="true">
-            <div
-              className={`prompt-wheel ${wheelSpinning ? 'prompt-wheel--spinning' : ''}`}
-              style={{ transform: `rotate(${wheelRotation}deg)` }}
-            >
-              <span className="prompt-wheel-label">SPIN</span>
+          <div className="prompt-wheel-layout">
+            <div className="prompt-wheel-stage" aria-hidden="true">
+              <div className="prompt-wheel-pointer" />
+              <svg
+                className="prompt-wheel-svg"
+                viewBox="0 0 280 280"
+                width="280"
+                height="280"
+                style={{
+                  transform: `rotate(${wheelRotation}deg)`,
+                  transition: reduceMotion || isWheelSpinning === false
+                    ? 'none'
+                    : 'transform 460ms cubic-bezier(0.18, 0.72, 0.22, 1)',
+                }}
+              >
+                {(() => {
+                  const options = WHEEL_OPTIONS[wheelCategory]
+                  const n = options.length
+                  const seg = 360 / n
+                  const cx = 140
+                  const cy = 140
+                  const r = 128
+                  function polar(angle) {
+                    const rad = (angle - 90) * Math.PI / 180
+                    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
+                  }
+                  return options.map((option, index) => {
+                    const start = index * seg
+                    const end = start + seg
+                    const s = polar(start)
+                    const e = polar(end)
+                    const large = seg > 180 ? 1 : 0
+                    const path = `M ${cx} ${cy} L ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y} Z`
+                    const mid = start + seg / 2
+                    const lx = cx + (r * 0.62) * Math.cos((mid - 90) * Math.PI / 180)
+                    const ly = cy + (r * 0.62) * Math.sin((mid - 90) * Math.PI / 180)
+                    const label = String(option).length > 14 ? String(option).slice(0, 12) + '…' : option
+                    return (
+                      <g key={`${option}-${index}`}>
+                        <path
+                          d={path}
+                          className={index % 2 === 0 ? 'prompt-wheel-slice prompt-wheel-slice--even' : 'prompt-wheel-slice prompt-wheel-slice--odd'}
+                        />
+                        <text
+                          x={lx}
+                          y={ly}
+                          className="prompt-wheel-slice-label"
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          transform={`rotate(${mid} ${lx} ${ly})`}
+                        >
+                          {label}
+                        </text>
+                      </g>
+                    )
+                  })
+                })()}
+                <circle cx="140" cy="140" r="34" className="prompt-wheel-hub" />
+                <text x="140" y="136" className="prompt-wheel-hub-label" textAnchor="middle">
+                  {wheelCategory}
+                </text>
+                <text x="140" y="152" className="prompt-wheel-hub-sub" textAnchor="middle">
+                  {isWheelSpinning ? 'SPINNING' : 'READY'}
+                </text>
+              </svg>
             </div>
-          </div>
 
-          <div className="tool-actions">
-            <button
-              type="button"
-              className="btn btn--action"
-              onClick={handleSpinAll}
-            >
-              SPIN ALL
-            </button>
-          </div>
-
-          <div className="wheel-rows">
-            {WHEEL_CATEGORIES.map((cat) => (
-              <div className="wheel-row" key={cat}>
-                <span className="wheel-row-label">{cat}</span>
-                <span className="wheel-row-value">{wheelValues[cat]}</span>
-                <button
-                  type="button"
-                  className="btn btn--secondary wheel-row-spin"
-                  onClick={() => handleSpinCategory(cat)}
-                  aria-label={`Re-spin ${cat}`}
-                >
-                  <RefreshCw size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="tool-result" role="status" aria-live="polite">
-            <p className="tool-result-text">{wheelPrompt}</p>
-            <div className="tool-result-actions">
+            <div className="tool-actions">
               <button
                 type="button"
                 className="btn btn--action"
-                onClick={() => startPiece(wheelPrompt)}
+                onClick={handleSpinAll}
+                disabled={isWheelSpinning}
+                aria-label="Spin all wheel categories"
               >
-                START THIS PIECE
+                SPIN ALL
               </button>
+              {isWheelSpinning && !reduceMotion && (
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={handleSkipWheel}
+                >
+                  SKIP ANIMATION
+                </button>
+              )}
+            </div>
+
+            {isWheelSpinning && (
+              <p className="tool-status" role="status" aria-live="polite">
+                Spinning {wheelCategory.toLowerCase()}...
+              </p>
+            )}
+
+            <div className="wheel-rows">
+              {WHEEL_CATEGORIES.map((cat) => (
+                <div className="wheel-row" key={cat}>
+                  <span className="wheel-row-label">{cat}</span>
+                  <span className="wheel-row-value">{wheelValues[cat]}</span>
+                  <button
+                    type="button"
+                    className="btn btn--secondary wheel-row-spin"
+                    onClick={() => handleSpinCategory(cat)}
+                    disabled={isWheelSpinning}
+                    aria-label={`Re-spin ${cat}`}
+                  >
+                    <RefreshCw size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="tool-result" role="status" aria-live="polite">
+              <p className="tool-result-text">{wheelPrompt}</p>
+              <div className="tool-result-actions">
+                <button
+                  type="button"
+                  className="btn btn--action"
+                  onClick={() => startPiece(wheelPrompt)}
+                  disabled={isWheelSpinning}
+                >
+                  START THIS PIECE
+                </button>
+              </div>
             </div>
           </div>
         </PaperPanel>

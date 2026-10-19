@@ -5384,3 +5384,82 @@ body:has(.public-site) {
     grid-template-columns: 1fr;
   }
 }
+
+/* Prompt Wheel (real wheel) */
+.prompt-wheel-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.prompt-wheel-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  width: min(280px, 100%);
+}
+
+.prompt-wheel-pointer {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 16px solid var(--color-accent, #2563eb);
+  z-index: 2;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+}
+
+.prompt-wheel-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.prompt-wheel-slice {
+  stroke: rgba(20, 20, 20, 0.18);
+  stroke-width: 1;
+}
+
+.prompt-wheel-slice--even {
+  fill: #f3eee3;
+}
+
+.prompt-wheel-slice--odd {
+  fill: #e9e2d2;
+}
+
+.prompt-wheel-slice-label {
+  font-size: 10px;
+  font-weight: 600;
+  fill: #1f1f1f;
+  pointer-events: none;
+}
+
+.prompt-wheel-hub {
+  fill: #f7f3ea;
+  stroke: rgba(20, 20, 20, 0.25);
+  stroke-width: 1;
+}
+
+.prompt-wheel-hub-label {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #1f1f1f;
+  letter-spacing: 0.08em;
+}
+
+.prompt-wheel-hub-sub {
+  font-size: 9px;
+  fill: #5a5a5a;
+  letter-spacing: 0.08em;
+}
+
+.tool-status {
+  font-size: 12px;
+  text-align: center;
+  color: var(--color-text-muted, #555);
+}

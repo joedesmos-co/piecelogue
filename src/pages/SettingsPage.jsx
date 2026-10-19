@@ -7,6 +7,10 @@ import {
   readBackupFile,
 } from '../utils/localBackup'
 import { formatUserError } from '../utils/userErrors'
+import {
+  isNoAnimationsPreferenceEnabled,
+  setNoAnimationsPreferenceEnabled,
+} from '../utils/motionPreference'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { StudioHeading } from '../components/StudioKit'
 
@@ -20,6 +24,7 @@ export default function SettingsPage() {
   const [importResult, setImportResult] = useState(null)
   const [pendingImport, setPendingImport] = useState(null)
   const [showImportConfirm, setShowImportConfirm] = useState(false)
+  const [noAnimations, setNoAnimations] = useState(() => isNoAnimationsPreferenceEnabled())
 
   async function handleExport() {
     setExporting(true)
@@ -89,6 +94,22 @@ export default function SettingsPage() {
         <div className="settings-card">
           <p className="settings-text">
             Piecelogue follows your system light or dark mode preference automatically.
+          </p>
+          <label className="form-check">
+            <input
+              type="checkbox"
+              className="form-checkbox"
+              checked={noAnimations}
+              onChange={(event) => {
+                const enabled = event.target.checked
+                setNoAnimations(enabled)
+                setNoAnimationsPreferenceEnabled(enabled)
+              }}
+            />
+            <span className="form-check-label">NO ANIMATIONS</span>
+          </label>
+          <p className="settings-text settings-text--muted">
+            Turns off wheel spin and other motion. Results appear instantly.
           </p>
         </div>
       </section>
