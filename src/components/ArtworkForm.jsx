@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImagePlus } from 'lucide-react'
 import {
   MEDIUM_TYPES,
@@ -62,6 +62,7 @@ export default function ArtworkForm({
   const [imageFile, setImageFile] = useState(null)
   const [previewImage, setPreviewImage] = useState(null)
   const [error, setError] = useState('')
+  const submittingRef = useRef(false)
 
   const newImagePreview = useMemo(() => {
     if (!previewImage) return null
@@ -127,6 +128,10 @@ export default function ArtworkForm({
     e.preventDefault()
     setError('')
 
+    if (submittingRef.current || saving) {
+      return
+    }
+
     if (!title.trim()) {
       setError('Title is required.')
       return
@@ -156,10 +161,13 @@ export default function ArtworkForm({
           ),
     }
 
+    submittingRef.current = true
     try {
       await onSave(data, imageFile)
     } catch (err) {
       setError(err.message || 'Failed to save artwork.')
+    } finally {
+      submittingRef.current = false
     }
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AuthProvider } from './context/AuthProvider'
 import { SyncProvider } from './context/SyncProvider'
 import { ArtworkProvider } from './context/ArtworkProvider'
@@ -32,6 +32,7 @@ function AppContent() {
   const [defaultFolderId, setDefaultFolderId] = useState(null)
   const [inspirationPrompt, setInspirationPrompt] = useState(null)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   useEffect(() => {
     applyPageSeo(PAGE_SEO.app)
@@ -65,6 +66,10 @@ function AppContent() {
   }
 
   async function handleSave(data, imageFile) {
+    if (savingRef.current) {
+      return
+    }
+    savingRef.current = true
     setSaving(true)
     try {
       if (editingArtwork) {
@@ -74,6 +79,7 @@ function AppContent() {
       }
       handleCloseForm()
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }

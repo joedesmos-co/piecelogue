@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArtworkContext } from './artworkContext'
 import * as artworkService from '../db/artworkService'
 import * as folderService from '../db/folderService'
+import { getDescendantFolderIds } from '../utils/folderTree'
 import {
   enqueueArtworkDeleteSync,
   enqueueArtworkMetadataSync,
@@ -123,11 +124,19 @@ export function ArtworkProvider({ children }) {
   }, [refresh])
 
   const removeFolder = useCallback(async (id, options) => {
-    const movedArtworks = await artworkService.getArtworksByFolderId(id)
+    const [allFolders, movedArtworks] = await Promise.all([
+      folderService.getAllFolders(),
+      artworkService.getArtworksByFolderId(id),
+    ])
+    const movedFolderIds = getDescendantFolderIds(id, allFolders)
     const folder = await folderService.deleteFolder(id, options)
     await enqueueFolderDeleteSync(id)
     for (const artwork of movedArtworks) {
       await enqueueArtworkMetadataSync(artwork.id)
+    }
+    // Child folders are reparented locally; push those moves to the cloud too.
+    for (const childFolderId of movedFolderIds) {
+      await enqueueFolderSync(childFolderId)
     }
     await refresh()
     notifyLocalChange()

@@ -232,4 +232,14 @@ describe('repair entry merging', () => {
     const merged = mergeRepairEntries([null, { title: 'broken', reasons: [] }])
     assert.equal(merged.length, 0)
   })
+
+  it('unions kinds when both sources describe the same artwork', () => {
+    const merged = mergeRepairEntries(
+      [{ artworkId: 'a', title: 'A', kinds: ['original'], reasons: ['unreadable_blob'] }],
+      [{ artworkId: 'a', title: 'A', kinds: ['thumbnail'], reasons: ['cloud_incomplete'] }],
+    )
+    assert.equal(merged.length, 1)
+    assert.deepEqual([...merged[0].kinds].sort(), ['original', 'thumbnail'])
+    assert.deepEqual([...merged[0].reasons].sort(), ['cloud_incomplete', 'unreadable_blob'])
+  })
 })

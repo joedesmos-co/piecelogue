@@ -27,6 +27,11 @@ export function mergeRepairEntries(...groups) {
         existing.reasons = Array.from(
           new Set([...(existing.reasons ?? []), ...(entry.reasons ?? [])]),
         )
+        if (Array.isArray(existing.kinds) || Array.isArray(entry.kinds)) {
+          existing.kinds = Array.from(
+            new Set([...(existing.kinds ?? []), ...(entry.kinds ?? [])]),
+          )
+        }
         if (!existing.title && entry.title) {
           existing.title = entry.title
         }
