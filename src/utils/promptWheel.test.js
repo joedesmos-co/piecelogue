@@ -55,6 +55,16 @@ describe('prompt wheel math', () => {
     assert.equal(pw.shortWheelLabel('Robot', 14), 'Robot')
   })
 
+  it('shrinks long labels below the normal font size to fit the radial space', () => {
+    const shortWidth = pw.estimateWheelLabelWidth('ROBOT')
+    const longWidth = pw.estimateWheelLabelWidth('A VERY LONG WHEEL LABEL THAT MUST FIT')
+    const shortSize = pw.getWheelLabelFontSize(16, shortWidth)
+    const longSize = pw.getWheelLabelFontSize(16, longWidth)
+    assert.ok(longSize < shortSize)
+    assert.ok(longSize < pw.WHEEL_MIN_LABEL_FONT)
+    assert.ok(longSize * longWidth <= 86 * 0.82)
+  })
+
   it('isWheelMotionDisabled combines flags', () => {
     assert.equal(pw.isWheelMotionDisabled(true, false), true)
     assert.equal(pw.isWheelMotionDisabled(false, true), true)

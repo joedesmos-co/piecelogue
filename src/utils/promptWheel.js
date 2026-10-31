@@ -219,8 +219,9 @@ export const WHEEL_MAX_LABEL_FONT = 12
 export const WHEEL_MIN_LABEL_FONT = 9
 
 /**
- * Font size for wheel labels: one size for the whole face, scaled so the
- * longest label still fits inside a single slice's arc.
+ * Initial font size for a wheel label, scaled to its available space.
+ * The component then measures the actual rendered text and shrinks further
+ * when needed. There is no minimum size that can force a label to overflow.
  *
  * `labelRadius` and `labelInset` describe where the labels are printed on the
  * wheel face; `arcLength` is the usable arc a single slice gets.
@@ -239,7 +240,7 @@ export function getWheelLabelFontSize(
   const byWidth = arcLength * 0.7
   const byDepth = (radialDepth * 0.82) / Math.max(0.5, Number(labelWidth) || WHEEL_MAX_LABEL_WIDTH)
   const size = Math.min(byWidth, byDepth)
-  return Math.max(WHEEL_MIN_LABEL_FONT, Math.min(WHEEL_MAX_LABEL_FONT, size))
+  return Math.max(0, Math.min(WHEEL_MAX_LABEL_FONT, size))
 }
 
 export function isWheelMotionDisabled(noAnimationsPreference, prefersReducedMotionFlag) {

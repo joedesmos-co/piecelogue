@@ -2,9 +2,11 @@
  * Prompt Wheel — a real, physical-looking spinner.
  */
 
+import { useId, useLayoutEffect, useRef } from 'react'
 import {
   WHEEL_SPIN_DURATION_MS,
   getWheelLabelFontSize,
+  estimateWheelLabelWidth,
 } from '../utils/promptWheel'
 
 const VIEW = 400
@@ -56,6 +58,33 @@ function slicePath(start, end) {
   ].join(' ')
 }
 
+// Measure the actual rendered font, including fallback fonts and tracking.
+// Long labels may shrink below the normal size; fitting takes precedence.
+function FittedWheelText({ children, fontSize, maxWidth, maxHeight, ...props }) {
+  const textRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const node = textRef.current
+    let active = true
+    const fit = () => {
+      if (!active || !node) return
+      node.setAttribute('font-size', String(fontSize))
+      const bounds = node.getBBox()
+      const scale = Math.min(
+        1,
+        maxWidth / Math.max(1, bounds.width),
+        maxHeight / Math.max(1, bounds.height),
+      )
+      node.setAttribute('font-size', String(fontSize * scale * 0.96))
+    }
+    fit()
+    document.fonts?.ready.then(fit)
+    return () => { active = false }
+  }, [children, fontSize, maxWidth, maxHeight])
+
+  return <text {...props} ref={textRef} fontSize={fontSize}>{children}</text>
+}
+
 export default function PromptWheel({
   slices = [],
   category = 'SUBJECT',
@@ -66,13 +95,13 @@ export default function PromptWheel({
   animated = true,
   onSpin,
 }) {
+  const clipId = useId()
   const options = slices.length > 0 ? slices : [{ value: '', label: '' }]
   const count = options.length
   const seg = 360 / count
 
   const labels = options.map((slice) => String(slice.label || '').toUpperCase())
 
-  const fontSize = getWheelLabelFontSize(count, 7.3, 140, 1.2)
   const hubText = spinning ? 'SPINNING…' : String(hubValue || '').toUpperCase()
   const hubValueSize = Math.max(
     11,
@@ -91,6 +120,16 @@ export default function PromptWheel({
         preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
+        <defs>
+          {options.map((_, index) => (
+            <clipPath id={`${clipId}-slice-${index}`} key={index}>
+              <path d={slicePath(index * seg, (index + 1) * seg)} />
+            </clipPath>
+          ))}
+          <clipPath id={`${clipId}-hub`}>
+            <circle cx={CX} cy={CY} r={R_HUB - 4} />
+          </clipPath>
+        </defs>
         <g
           className="prompt-wheel-disc"
           style={{
@@ -128,8 +167,8 @@ export default function PromptWheel({
             const flipped = mid < 180
             const angle = flipped ? mid + 270 : mid + 90
             return (
-              <text
-                key={`label-${slice.value}-${index}`}
+              <g key={`label-${slice.value}-${index}`} clipPath={`url(#${clipId}-slice-${index})`}>
+              <FittedWheelText
                 x={p.x.toFixed(2)}
                 y={p.y.toFixed(2)}
                 transform={`rotate(${angle.toFixed(2)}, ${p.x.toFixed(2)}, ${p.y.toFixed(2)})`}
@@ -139,13 +178,16 @@ export default function PromptWheel({
                     ? ' prompt-wheel-slice-label--selected'
                     : '')
                 }
-                fontSize={fontSize.toFixed(2)}
+                fontSize={getWheelLabelFontSize(count, estimateWheelLabelWidth(labels[index]), 140, 1.2)}
+                maxWidth={R_TEXT - R_SLICE_IN - 8}
+                maxHeight={Math.max(1, 2 * (R_SLICE_IN + 6) * Math.sin(Math.PI / Math.max(2, count)) - 8)}
                 fill={textFill}
                 textAnchor={flipped ? 'end' : 'start'}
                 dominantBaseline="middle"
               >
                 {labels[index]}
-              </text>
+              </FittedWheelText>
+              </g>
             )
           })}
 
@@ -163,28 +205,34 @@ export default function PromptWheel({
             style={{ cursor: onSpin ? 'pointer' : 'default' }}
           />
           <circle cx={CX} cy={CY} r={R_HUB_INNER} className="prompt-wheel-hub-inner" />
-          <text
+          <g clipPath={`url(#${clipId}-hub)`}>
+          <FittedWheelText
             x={CX}
             y={CY - 12}
             className="prompt-wheel-hub-label"
             textAnchor="middle"
-            fontSize={hubLabelSize.toFixed(2)}
+            fontSize={hubLabelSize}
+            maxWidth={76}
+            maxHeight={18}
             onClick={onSpin}
             style={{ cursor: onSpin ? 'pointer' : 'default' }}
           >
             {category}
-          </text>
-          <text
+          </FittedWheelText>
+          <FittedWheelText
             x={CX}
             y={CY + 16}
             className="prompt-wheel-hub-value"
             textAnchor="middle"
-            fontSize={hubValueSize.toFixed(2)}
+            fontSize={hubValueSize}
+            maxWidth={72}
+            maxHeight={24}
             onClick={onSpin}
             style={{ cursor: onSpin ? 'pointer' : 'default' }}
           >
             {hubText}
-          </text>
+          </FittedWheelText>
+          </g>
 
           <g className="prompt-wheel-pointer">
             <path
