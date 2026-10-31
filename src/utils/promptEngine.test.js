@@ -93,3 +93,20 @@ describe('reduced motion / offline', () => {
     assert.ok(p.length > 0)
   })
 })
+
+
+describe('prompt wheel candidate counts', () => {
+  for (const cat of ['SUBJECT', 'MOOD', 'SETTING', 'CONSTRAINT']) {
+    it(`${cat} wheel has 16 visible candidates and includes the pick`, () => {
+      const pool =
+        cat === 'SUBJECT' ? pe.WHEEL_SUBJECTS :
+        cat === 'MOOD' ? pe.WHEEL_MOODS :
+        cat === 'SETTING' ? pe.WHEEL_SETTINGS :
+        pe.WHEEL_CONSTRAINTS
+      const pick = pool[0]
+      const candidates = pe.getWheelCandidates(cat, pick)
+      assert.equal(candidates.length, 16)
+      assert.ok(candidates.includes(pick))
+    })
+  }
+})

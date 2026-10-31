@@ -1,6 +1,11 @@
 // Local, offline prompt-generation engine for Piecelogue Tools.
 // No network, no AI APIs. Curated arrays + template rules.
 
+import {
+  getWheelCandidates as getWheelCandidatesFromPool,
+  getWheelDisplayLabel,
+} from './promptWheel.js'
+
 function makeRng(seed) {
   if (typeof seed === 'function') return seed
   if (seed == null) return Math.random
@@ -13,6 +18,17 @@ function makeRng(seed) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+function makeSecureRng() {
+  if (typeof crypto !== 'undefined' && crypto && typeof crypto.getRandomValues === 'function') {
+    return () => {
+      const arr = new Uint32Array(1)
+      crypto.getRandomValues(arr)
+      return arr[0] / 0x100000000
+    }
+  }
+  return Math.random
 }
 
 function pick(arr, rng = Math.random) {
@@ -519,6 +535,16 @@ export const WHEEL_SUBJECTS = [
   'traveler',
   'librarian',
   'chef',
+  'pilot',
+  'monk',
+  'painter',
+  'sailor',
+  'baker',
+  'runner',
+  'sculptor',
+  'archer',
+  'dancer',
+  'explorer',
 ]
 
 export const WHEEL_MOODS = [
@@ -532,6 +558,14 @@ export const WHEEL_MOODS = [
   'gentle',
   'dramatic',
   'nostalgic',
+  'curious',
+  'anxious',
+  'serene',
+  'bold',
+  'dreamy',
+  'restless',
+  'cheerful',
+  'somber',
 ]
 
 export const WHEEL_SETTINGS = [
@@ -547,6 +581,15 @@ export const WHEEL_SETTINGS = [
   'in a snowy forest',
   'on a train platform',
   'in an overgrown greenhouse',
+  'in a rainy forest',
+  'on a city rooftop',
+  'in a quiet library',
+  'at a night market',
+  'in a snowy village',
+  'by a lighthouse',
+  'in a desert town',
+  'on a mountain trail',
+  'in a coastal village',
 ]
 
 export const WHEEL_CONSTRAINTS = [
@@ -558,10 +601,62 @@ export const WHEEL_CONSTRAINTS = [
   'with continuous line',
   'with no outlines',
   'using one pencil',
+  'using only two colors',
+  'with bold outlines',
+  'in a limited palette',
+  'with soft shading',
+  'using flat colors',
+  'with high contrast',
+  'in black and white',
+  'with textured strokes',
 ]
 
+/**
+ * How many candidate slices a single wheel shows.
+ *
+ * The wheel is a readable object, not a database dump: only a slice of the
+ * pool is on the wheel at any one time. The generator still draws from the
+ * complete curated dataset.
+ */
+export const WHEEL_SLICE_COUNT = 16
+
+export const WHEEL_SLICE_COUNTS = {
+  SUBJECT: 16,
+  MOOD: 16,
+  SETTING: 16,
+  CONSTRAINT: 16,
+}
+
+export const WHEEL_SUBJECT_SLICE_COUNT = WHEEL_SLICE_COUNTS.SUBJECT
+export const WHEEL_MOOD_SLICE_COUNT = WHEEL_SLICE_COUNTS.MOOD
+export const WHEEL_SETTING_SLICE_COUNT = WHEEL_SLICE_COUNTS.SETTING
+export const WHEEL_CONSTRAINT_SLICE_COUNT = WHEEL_SLICE_COUNTS.CONSTRAINT
+
+export function getWheelSliceCount(category) {
+  const cat = String(category || '').toUpperCase()
+  return WHEEL_SLICE_COUNTS[cat] || WHEEL_SLICE_COUNT
+}
+
+export function getWheelCandidates(category, selectedValue, count, rng) {
+  const cat = String(category || '').toUpperCase()
+  const pool =
+    cat === 'SUBJECT' ? WHEEL_SUBJECTS :
+    cat === 'MOOD' ? WHEEL_MOODS :
+    cat === 'SETTING' ? WHEEL_SETTINGS :
+    cat === 'CONSTRAINT' ? WHEEL_CONSTRAINTS :
+    WHEEL_SUBJECTS
+  const target = count == null ? getWheelSliceCount(cat) : count
+  return getWheelCandidatesFromPool(pool, selectedValue, target, rng)
+}
+
+export { getWheelDisplayLabel }
+
 export function spinCategory(category, currentOrRng, rngInput) {
-  const rng = makeRng(typeof currentOrRng === 'function' ? currentOrRng : rngInput)
+  let rng
+  if (typeof currentOrRng === 'function') rng = currentOrRng
+  else if (typeof currentOrRng === 'number') rng = makeRng(currentOrRng)
+  else if (currentOrRng == null && rngInput == null) rng = makeSecureRng()
+  else rng = makeRng(rngInput)
   const cat = String(category || '').toUpperCase()
   if (cat === 'SUBJECT') return pick(WHEEL_SUBJECTS, rng)
   if (cat === 'MOOD') return pick(WHEEL_MOODS, rng)
@@ -571,7 +666,11 @@ export function spinCategory(category, currentOrRng, rngInput) {
 }
 
 export function spinAll(seedOrCurrent, seed) {
-  const rng = makeRng(typeof seedOrCurrent === 'function' ? seedOrCurrent : (seed ?? (typeof seedOrCurrent === 'number' ? seedOrCurrent : undefined)))
+  let rng
+  if (typeof seedOrCurrent === 'function') rng = seedOrCurrent
+  else if (typeof seedOrCurrent === 'number') rng = makeRng(seedOrCurrent)
+  else if (seedOrCurrent == null && seed == null) rng = makeSecureRng()
+  else rng = makeRng(seed ?? seedOrCurrent)
   return {
     SUBJECT: pick(WHEEL_SUBJECTS, rng),
     MOOD: pick(WHEEL_MOODS, rng),

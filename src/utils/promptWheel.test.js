@@ -161,3 +161,19 @@ describe('prompt wheel sequence', () => {
     assert.ok(p.includes('Robot'))
   })
 })
+
+describe('candidate wheel size', () => {
+  it('contains the requested number of entries', () => {
+    const pool = Array.from({ length: 24 }, (_, i) => `item-${i}`)
+    const candidates = pw.getWheelCandidates(pool, 'item-0', 16)
+    assert.equal(candidates.length, 16)
+    assert.ok(candidates.includes('item-0'))
+  })
+
+  it('never exceeds the pool size', () => {
+    const pool = ['a', 'b', 'c']
+    const candidates = pw.getWheelCandidates(pool, 'a', 16)
+    assert.equal(candidates.length, 3)
+    assert.ok(candidates.includes('a'))
+  })
+})
