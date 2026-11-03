@@ -479,13 +479,19 @@ body:has(.app-shell) {
     padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   }
   .app-content {
-    padding: 24px 28px;
+    padding:
+      24px max(28px, env(safe-area-inset-right, 0px))
+      24px max(28px, env(safe-area-inset-left, 0px));
   }
   .mobile-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 30px 30px 8px;
+    padding:
+      calc(30px + env(safe-area-inset-top, 0px))
+      max(30px, env(safe-area-inset-right, 0px))
+      8px
+      max(30px, env(safe-area-inset-left, 0px));
     background: transparent;
     border: 0;
   }
@@ -567,10 +573,16 @@ body:has(.app-shell) {
 
 @media (max-width: 600px) {
   .app-content {
-    padding: 16px 18px 12px;
+    padding:
+      16px max(18px, env(safe-area-inset-right, 0px))
+      12px max(18px, env(safe-area-inset-left, 0px));
   }
   .mobile-header {
-    padding: 26px 23px 5px;
+    padding:
+      calc(26px + env(safe-area-inset-top, 0px))
+      max(23px, env(safe-area-inset-right, 0px))
+      5px
+      max(23px, env(safe-area-inset-left, 0px));
   }
 }
 
